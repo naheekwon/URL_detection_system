@@ -1,0 +1,8 @@
+{
+  "title": "Final Adaptive Model on Final Test - Phishing Enhanced",
+  "accuracy": 0.8932216750785736,
+  "macro_f1": 0.8701364224621219,
+  "weighted_f1": 0.8992620788838328,
+  "phishing_specific_features": true,
+  "phishing_weight_boost": 1.15
+}

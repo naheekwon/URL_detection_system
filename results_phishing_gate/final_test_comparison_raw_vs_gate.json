@@ -1,0 +1,26 @@
+{
+  "raw": {
+    "title": "Final Adaptive Model on Final Test - RAW",
+    "accuracy": 0.9273948340994482,
+    "macro_f1": 0.897656716287162,
+    "weighted_f1": 0.9289933290975291,
+    "use_phishing_gate": false,
+    "phishing_min_prob": null,
+    "phishing_min_margin": null
+  },
+  "phishing_gate": {
+    "title": "Final Adaptive Model on Final Test - Phishing Gate",
+    "accuracy": 0.9322781764760082,
+    "macro_f1": 0.8993178059619276,
+    "weighted_f1": 0.9328719576088843,
+    "use_phishing_gate": true,
+    "phishing_min_prob": 0.55,
+    "phishing_min_margin": 0.08
+  },
+  "gate_config": {
+    "PHISHING_MIN_PROB": 0.55,
+    "PHISHING_MIN_MARGIN": 0.08,
+    "USE_PHISHING_GATE_FOR_STREAM": true,
+    "USE_PHISHING_GATE_FOR_FINAL": true
+  }
+}
