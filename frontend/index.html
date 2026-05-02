@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkWatcher | 투명하고 안전한 URL 분석</title>
+    
+    <style>
+        /* 외부 폰트 없이 깔끔한 기본 시스템 폰트 사용 */
+        :root {
+            /* 맑고 투명한 하늘색 그라데이션 컬러 팔레트 */
+            --bg-top: #ffffff; 
+            --bg-mid: #e0f2fe;
+            --bg-bottom: #bae6fd;
+            
+            /* 가독성을 위한 다크 네이비 텍스트 */
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            
+            /* 포인트 컬러 (선명한 블루) */
+            --primary-color: #0284c7; 
+            --accent-color: #38bdf8;  
+            
+            /* 유리 질감 공통 변수 */
+            --glass-bg: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(255, 255, 255, 0.9);
+            --glass-shadow: 0 10px 40px rgba(2, 132, 199, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* 시스템 기본 폰트 적용 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            color: var(--text-main);
+            overflow-x: hidden;
+            /* 위에서 아래로 하얗고 투명한 하늘색이 짙어지는 그라데이션 */
+            background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 40%, var(--bg-bottom) 100%);
+            background-attachment: fixed;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 5%;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-main);
+        }
+
+        .logo span {
+            color: var(--primary-color);
+        }
+
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-left: 30px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--primary-color);
+        }
+
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; 
+            justify-content: flex-start;
+            /* 75vh -> 65vh로 수정하여 너무 내려간 위치를 적당히 끌어올림 */
+            padding-top: 65vh; 
+            padding-left: 5%; 
+        }
+
+        .spline-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 110vh;
+            z-index: -1;
+            pointer-events: auto;
+            opacity: 0.85;
+            mix-blend-mode: multiply;
+            mask-image: linear-gradient(to bottom, black 50%, rgba(0,0,0,0.3) 80%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 50%, rgba(0,0,0,0.3) 80%, transparent 100%);
+            /* 워터마크 숨기기 위해 컨테이너 밖으로 나간 것 잘라내기 */
+            overflow: hidden; 
+        }
+
+        /* iframe 길이를 길게 빼서 하단 워터마크를 잘라냄 */
+        .spline-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(100% + 80px); /* 원래 높이보다 80px 밑으로 더 내림 */
+            border: none;
+        }
+
+        .hero-content {
+            z-index: 10;
+            width: 100%;
+            max-width: 650px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; 
+            gap: 20px;
+        }
+
+        .hero-content > * {
+            pointer-events: auto;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 60px;
+            padding: 8px 8px 8px 28px;
+            width: 100%;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s ease;
+        }
+
+        .search-container:focus-within {
+            border-color: rgba(2, 132, 199, 0.4);
+            box-shadow: 0 15px 40px rgba(2, 132, 199, 0.15), inset 0 0 0 2px rgba(255,255,255,0.8);
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .search-container input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.05rem;
+            outline: none;
+            min-width: 0;
+            font-weight: 500;
+        }
+
+        .search-container input::placeholder {
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        .search-container button {
+            background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%); 
+            color: #ffffff;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 38px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+        }
+
+        .search-container button:hover {
+            box-shadow: 0 8px 25px rgba(2, 132, 199, 0.4);
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%); 
+        }
+
+        .search-container button:active {
+            transform: translateY(1px);
+        }
+
+        .loader {
+            display: none;
+            margin-top: 15px;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        .result-box {
+            display: none;
+            margin-top: 10px;
+            padding: 24px;
+            border-radius: 20px;
+            width: 100%;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            box-shadow: var(--glass-shadow);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .features {
+            padding: 80px 5% 150px;
+            max-width: 1200px;
+            margin: 0 auto;
+            z-index: 10;
+            position: relative;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 60px;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--glass-bg); 
+            border: 1px solid var(--glass-border); 
+            border-radius: 24px;
+            padding: 40px 32px;
+            backdrop-filter: blur(20px);
+            box-shadow: var(--glass-shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 20px 40px rgba(2, 132, 199, 0.12);
+        }
+
+        .card h3 {
+            font-size: 1.35rem;
+            margin-bottom: 12px;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            line-height: 1.65;
+            font-size: 0.95rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            letter-spacing: 0.5px;
+        }
+
+        /* 밝은 테마에 맞춘 뱃지 컬러 */
+        .badge.phishing { background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; }
+        .badge.malware { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+        .badge.safe { background: #d1fae5; color: #059669; border: 1px solid #a7f3d0; }
+
+        @media (max-width: 768px) {
+            header { padding: 18px 6%; }
+            nav { display: none; }
+            .hero {
+                /* 모바일 비율도 함께 수정 */
+                padding-top: 60vh;
+                padding-left: 5%; 
+                padding-right: 5%;
+            }
+            .search-container { padding: 6px; padding-left: 18px; }
+            .search-container button { padding: 13px 22px; font-size: 0.9rem; }
+        }
+
+        @media (max-width: 480px) {
+            .hero { padding-top: 55vh; }
+            .search-container { flex-direction: column; align-items: stretch; border-radius: 28px; padding: 16px; gap: 12px; }
+            .search-container input { text-align: center; font-size: 0.95rem; }
+            .search-container button { width: 100%; }
+            .spline-container { height: 80vh; }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            Link<span>Watcher</span>
+        </div>
+
+        <nav>
+            <a href="#">탐지 모델</a>
+            <a href="#">API 연동</a>
+            <a href="#">엔터프라이즈</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <!-- 사용자 요청 Spline 3D 링크 적용 (iframe 코드를 CSS로 조작하여 로고 숨김) -->
+            <div class="spline-container">
+                <iframe src="https://my.spline.design/interactiveaiwebsite-tatdYWqc9JW1UwvX1BSXUGFa/"></iframe>
+            </div>
+
+            <div class="hero-content">
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        id="urlInput" 
+                        placeholder="분석할 URL을 붙여넣으세요 (예: example.com)" 
+                        autocomplete="off"
+                    >
+                    <button onclick="scanUrl()">분석하기</button>
+                </div>
+
+                <div class="loader" id="loader">AI 모델이 URL의 투명도를 정밀 검사 중입니다...</div>
+                <div class="result-box" id="resultBox"></div>
+            </div>
+        </section>
+
+        <section class="features">
+            <h2 class="section-title">정밀한 다중 클래스 탐지</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <span class="badge phishing">Phishing</span>
+                    <h3>피싱 사이트 차단</h3>
+                    <p>
+                        사용자의 개인정보나 금융 정보를 탈취하기 위해 정교하게 위조된 로그인 페이지 및 가짜 웹사이트를 머신러닝으로 즉각 식별합니다.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <span class="badge malware">Malware</span>
+                    <h3>악성코드 유포지 탐지</h3>
+                    <p>
+                        랜섬웨어, 트로이 목마 등 악성 스크립트가 숨겨져 있거나 자동으로 다운로드를 유발하는 위험한 엔드포인트를 사전에 탐지합니다.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <span class="badge safe">Safe Browsing</span>
+                    <h3>안전한 브라우징 보장</h3>
+                    <p>
+                        정상적이고 안전한 URL은 신속하게 통과시켜 업무 지연을 방지하며, 데이터는 철저히 익명화되어 프라이버시를 보호합니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+
+        urlInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                scanUrl();
+            }
+        });
+
+        function scanUrl() {
+            const input = document.getElementById('urlInput').value.trim();
+            const loader = document.getElementById('loader');
+            const resultBox = document.getElementById('resultBox');
+
+            if (!input) {
+                alert("분석할 URL을 입력해주세요.");
+                return;
+            }
+
+            resultBox.style.display = 'none';
+            loader.style.display = 'block';
+
+            setTimeout(() => {
+                loader.style.display = 'none';
+
+                const lowerInput = input.toLowerCase();
+                const isPhishing = lowerInput.includes('phish') || lowerInput.includes('login') || lowerInput.includes('verify');
+                const isMalware = lowerInput.includes('malware') || lowerInput.includes('download') || lowerInput.includes('exe');
+                const isSpam = lowerInput.includes('spam') || lowerInput.includes('free') || lowerInput.includes('event');
+
+                /* 밝은 테마에 맞춰 결과창 UI 색상 조정 */
+                if (isPhishing) {
+                    resultBox.innerHTML = `
+                        <h4 style="color: #dc2626; font-size: 1.15rem; margin-bottom: 8px;">🚨 악성 URL 감지됨 (Phishing)</h4>
+                        <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
+                            이 링크는 사용자의 정보를 탈취할 위험이 높은 <strong>피싱 URL</strong>로 분류되었습니다.
+                        </p>
+                        <div style="background: #fef2f2; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #7f1d1d; border: 1px solid #fecaca;">
+                            Classified as: <strong style="color: #dc2626; font-size:1rem;">Phishing</strong>
+                        </div>
+                    `;
+                    resultBox.style.borderColor = "#fca5a5";
+                    resultBox.style.boxShadow = "0 10px 30px rgba(220, 38, 38, 0.1)";
+                } else if (isMalware) {
+                    resultBox.innerHTML = `
+                        <h4 style="color: #d97706; font-size: 1.15rem; margin-bottom: 8px;">⚠️ 악성코드 URL 감지됨 (Malware)</h4>
+                        <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
+                            이 링크는 악성 파일 다운로드 또는 악성 스크립트 실행 가능성이 있는 <strong>악성코드 URL</strong>로 분류되었습니다.
+                        </p>
+                        <div style="background: #fffbeb; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #92400e; border: 1px solid #fde68a;">
+                            Classified as: <strong style="color: #d97706; font-size:1rem;">Malware</strong>
+                        </div>
+                    `;
+                    resultBox.style.borderColor = "#fcd34d";
+                    resultBox.style.boxShadow = "0 10px 30px rgba(217, 119, 6, 0.1)";
+                } else if (isSpam) {
+                    resultBox.innerHTML = `
+                        <h4 style="color: #0284c7; font-size: 1.15rem; margin-bottom: 8px;">📨 스팸 URL 의심됨 (Spam)</h4>
+                        <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
+                            이 링크는 광고성 문구, 무료 이벤트 유도, 반복성 패턴을 포함할 가능성이 있는 <strong>스팸 URL</strong>로 분류되었습니다.
+                        </p>
+                        <div style="background: #f0f9ff; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #075985; border: 1px solid #bae6fd;">
+                            Classified as: <strong style="color: #0284c7; font-size:1rem;">Spam</strong>
+                        </div>
+                    `;
+                    resultBox.style.borderColor = "#7dd3fc";
+                    resultBox.style.boxShadow = "0 10px 30px rgba(2, 132, 199, 0.1)";
+                } else {
+                    resultBox.innerHTML = `
+                        <h4 style="color: #059669; font-size: 1.15rem; margin-bottom: 8px;">✅ 투명하고 안전한 URL</h4>
+                        <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
+                            악성코드, 피싱, 스팸의 주요 징후가 발견되지 않은 <strong>안전한 URL</strong>입니다.
+                        </p>
+                        <div style="background: #ecfdf5; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #065f46; border: 1px solid #a7f3d0;">
+                            Classified as: <strong style="color: #059669; font-size:1rem;">Benign (Safe)</strong>
+                        </div>
+                    `;
+                    resultBox.style.borderColor = "#6ee7b7";
+                    resultBox.style.boxShadow = "0 10px 30px rgba(5, 150, 105, 0.1)";
+                }
+
+                resultBox.style.display = 'block';
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
