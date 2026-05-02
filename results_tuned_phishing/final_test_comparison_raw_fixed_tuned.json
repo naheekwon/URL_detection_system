@@ -1,0 +1,272 @@
+{
+  "raw": {
+    "title": "Final Adaptive Model on Final Test - RAW",
+    "accuracy": 0.9273948340994482,
+    "macro_f1": 0.897656716287162,
+    "weighted_f1": 0.9289933290975291,
+    "prediction_mode": "raw",
+    "classification_report": {
+      "benign": {
+        "precision": 0.968606087835561,
+        "recall": 0.9400300550490146,
+        "f1-score": 0.9541041517664863,
+        "support": 128431
+      },
+      "defacement": {
+        "precision": 0.9814867457892118,
+        "recall": 0.9545218923869095,
+        "f1-score": 0.9678165349778377,
+        "support": 28937
+      },
+      "malware": {
+        "precision": 0.8168651146259108,
+        "recall": 0.9422919229192291,
+        "f1-score": 0.8751070918610185,
+        "support": 9756
+      },
+      "phishing": {
+        "precision": 0.7545019157088123,
+        "recall": 0.8369696111071757,
+        "f1-score": 0.7935990865433052,
+        "support": 28234
+      },
+      "accuracy": 0.9273948340994482,
+      "macro avg": {
+        "precision": 0.880364965989874,
+        "recall": 0.9184533703655823,
+        "f1-score": 0.897656716287162,
+        "support": 195358
+      },
+      "weighted avg": {
+        "precision": 0.9319929236382658,
+        "recall": 0.9273948340994482,
+        "f1-score": 0.9289933290975291,
+        "support": 195358
+      }
+    },
+    "confusion_matrix": [
+      [
+        120729,
+        312,
+        702,
+        6688
+      ],
+      [
+        191,
+        27621,
+        524,
+        601
+      ],
+      [
+        116,
+        47,
+        9193,
+        400
+      ],
+      [
+        3606,
+        162,
+        835,
+        23631
+      ]
+    ],
+    "phishing_precision": 0.7545019157088123,
+    "phishing_recall": 0.8369696111071757,
+    "phishing_f1": 0.7935990865433052,
+    "benign_to_phishing": 6688,
+    "phishing_to_benign": 3606
+  },
+  "fixed_gate": {
+    "title": "Final Adaptive Model on Final Test - Fixed Phishing Gate",
+    "accuracy": 0.9322781764760082,
+    "macro_f1": 0.8993178059619276,
+    "weighted_f1": 0.9328719576088843,
+    "prediction_mode": "fixed_gate",
+    "classification_report": {
+      "benign": {
+        "precision": 0.9645258008521382,
+        "recall": 0.9518262724731568,
+        "f1-score": 0.9581339572286819,
+        "support": 128431
+      },
+      "defacement": {
+        "precision": 0.978217334785511,
+        "recall": 0.9621937312091786,
+        "f1-score": 0.9701393728222997,
+        "support": 28937
+      },
+      "malware": {
+        "precision": 0.8008006265773214,
+        "recall": 0.9432144321443214,
+        "f1-score": 0.8661928742881349,
+        "support": 9756
+      },
+      "phishing": {
+        "precision": 0.7967834217136478,
+        "recall": 0.8089183254232486,
+        "f1-score": 0.8028050195085943,
+        "support": 28234
+      },
+      "accuracy": 0.9322781764760082,
+      "macro avg": {
+        "precision": 0.8850817959821546,
+        "recall": 0.9165381903124763,
+        "f1-score": 0.8993178059619276,
+        "support": 195358
+      },
+      "weighted avg": {
+        "precision": 0.9341346767855977,
+        "recall": 0.9322781764760082,
+        "f1-score": 0.9328719576088843,
+        "support": 195358
+      }
+    },
+    "confusion_matrix": [
+      [
+        122244,
+        354,
+        731,
+        5102
+      ],
+      [
+        195,
+        27843,
+        548,
+        351
+      ],
+      [
+        133,
+        49,
+        9202,
+        372
+      ],
+      [
+        4168,
+        217,
+        1010,
+        22839
+      ]
+    ],
+    "phishing_precision": 0.7967834217136478,
+    "phishing_recall": 0.8089183254232486,
+    "phishing_f1": 0.8028050195085943,
+    "benign_to_phishing": 5102,
+    "phishing_to_benign": 4168
+  },
+  "tuned_bidirectional_gate": {
+    "title": "Final Adaptive Model on Final Test - Tuned Bidirectional Phishing Gate",
+    "accuracy": 0.9341158283766214,
+    "macro_f1": 0.8992479767621152,
+    "weighted_f1": 0.9340398845972062,
+    "prediction_mode": "tuned_bidirectional_gate",
+    "classification_report": {
+      "benign": {
+        "precision": 0.9603894028792118,
+        "recall": 0.9594023249838435,
+        "f1-score": 0.959895610174113,
+        "support": 128431
+      },
+      "defacement": {
+        "precision": 0.9767035119630614,
+        "recall": 0.9649237999792653,
+        "f1-score": 0.9707779226423294,
+        "support": 28937
+      },
+      "malware": {
+        "precision": 0.7950600224544434,
+        "recall": 0.9436244362443624,
+        "f1-score": 0.8629950785094915,
+        "support": 9756
+      },
+      "phishing": {
+        "precision": 0.8233675442510784,
+        "recall": 0.7842317772897924,
+        "f1-score": 0.8033232957225266,
+        "support": 28234
+      },
+      "accuracy": 0.9341158283766214,
+      "macro avg": {
+        "precision": 0.8888801203869487,
+        "recall": 0.913045584624316,
+        "f1-score": 0.8992479767621152,
+        "support": 195358
+      },
+      "weighted avg": {
+        "precision": 0.9347464948981135,
+        "recall": 0.9341158283766214,
+        "f1-score": 0.9340398845972062,
+        "support": 195358
+      }
+    },
+    "confusion_matrix": [
+      [
+        123217,
+        359,
+        735,
+        4120
+      ],
+      [
+        196,
+        27922,
+        551,
+        268
+      ],
+      [
+        138,
+        50,
+        9206,
+        362
+      ],
+      [
+        4748,
+        257,
+        1087,
+        22142
+      ]
+    ],
+    "phishing_precision": 0.8233675442510784,
+    "phishing_recall": 0.7842317772897924,
+    "phishing_f1": 0.8033232957225266,
+    "benign_to_phishing": 4120,
+    "phishing_to_benign": 4748
+  },
+  "tuned_gate_config": {
+    "demote_prob": 0.6,
+    "demote_margin": 0.0,
+    "promote_prob": 0.25,
+    "promote_margin": 0.0,
+    "objective": 0.7439930081051563,
+    "phishing_f1": 0.7527747664033865,
+    "benign_to_phishing_rate": 0.05854505532153452
+  },
+  "gate_search_config": {
+    "DEMOTE_PROB_GRID": [
+      0.45,
+      0.5,
+      0.55,
+      0.6
+    ],
+    "DEMOTE_MARGIN_GRID": [
+      0.0,
+      0.03,
+      0.06,
+      0.08
+    ],
+    "PROMOTE_PROB_GRID": [
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5
+    ],
+    "PROMOTE_MARGIN_GRID": [
+      0.0,
+      0.03,
+      0.06,
+      0.1,
+      0.15
+    ],
+    "BENIGN_TO_PHISHING_PENALTY": 0.15
+  }
+}
