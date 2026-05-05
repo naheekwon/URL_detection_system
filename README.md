@@ -2,7 +2,6 @@
 
 Graduation project for AI-based malicious URL detection with an adaptive risk-token dictionary and River-style progressive streaming evaluation.
 <br/>
-<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
 <br/>
 
 ## Overview
@@ -16,3 +15,7 @@ In the streaming phase, each URL batch is evaluated before it is used for model 
 
 ```text
 predict -> metric update -> train/update
+
+<br/>
+<br/>
+<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
