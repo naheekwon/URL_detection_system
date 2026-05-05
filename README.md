@@ -7,7 +7,6 @@ Graduation project for AI-based malicious URL detection with an adaptive risk-to
 ## Overview
 <img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
 <br/>
-<br/>
 LinkWatcher is an AI-based URL risk detection project designed to classify URLs into multiple security categories, such as benign, phishing, malware, and defacement.  
 The system combines URL tokenization, lexical feature extraction, TF-IDF features, and an adaptive risk-token dictionary to support explainable URL risk analysis.
 
