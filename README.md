@@ -17,5 +17,3 @@ In the streaming phase, each URL batch is evaluated before it is used for model 
 
 ```text
 predict -> metric update -> train/update
-
-
