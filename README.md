@@ -1,7 +1,9 @@
 # LinkWatcher: AI-based Multi-Class Malicious URL Detection
 
 Graduation project for AI-based malicious URL detection with an adaptive risk-token dictionary and River-style progressive streaming evaluation.
+<br/>
 <img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
+<br/>
 
 ## Overview
 
