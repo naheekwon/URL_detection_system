@@ -5,8 +5,6 @@ Graduation project for AI-based malicious URL detection with an adaptive risk-to
 <br/>
 
 ## Overview
-<br/>
-<br/>
 <img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
 <br/>
 <br/>
