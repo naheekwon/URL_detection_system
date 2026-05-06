@@ -76,10 +76,27 @@
             font-size: 0.95rem;
             font-weight: 500;
             transition: color 0.3s ease;
+            position: relative;
+        }
+
+        nav a::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: -6px;
+            width: 0;
+            height: 2px;
+            border-radius: 999px;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
         }
 
         nav a:hover {
             color: var(--primary-color);
+        }
+
+        nav a:hover::after {
+            width: 100%;
         }
 
         .hero {
@@ -248,6 +265,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 24px;
+            perspective: 1200px;
         }
 
         .card {
@@ -257,13 +275,62 @@
             padding: 40px 32px;
             backdrop-filter: blur(20px);
             box-shadow: var(--glass-shadow);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: 
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                background 0.35s ease,
+                box-shadow 0.35s ease,
+                border-color 0.35s ease;
+            position: relative;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(56, 189, 248, 0.22), transparent 38%);
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+        }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            top: -80px;
+            right: -80px;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: rgba(56, 189, 248, 0.13);
+            filter: blur(8px);
+            transition: transform 0.45s ease, opacity 0.45s ease;
+            opacity: 0.65;
         }
 
         .card:hover {
-            transform: translateY(-8px);
-            background: rgba(255, 255, 255, 0.85);
-            box-shadow: 0 20px 40px rgba(2, 132, 199, 0.12);
+            transform: translateY(-10px) rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg));
+            background: rgba(255, 255, 255, 0.88);
+            box-shadow: 0 24px 50px rgba(2, 132, 199, 0.16);
+            border-color: rgba(56, 189, 248, 0.75);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card:hover::after {
+            transform: scale(1.25) translate(-14px, 14px);
+            opacity: 0.95;
+        }
+
+        .card h3,
+        .card p,
+        .card .badge {
+            position: relative;
+            z-index: 1;
         }
 
         .card h3 {
@@ -287,6 +354,11 @@
             font-weight: 700;
             margin-bottom: 24px;
             letter-spacing: 0.5px;
+            transition: transform 0.35s ease;
+        }
+
+        .card:hover .badge {
+            transform: translateY(-3px) scale(1.04);
         }
 
         .badge.phishing { background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; }
@@ -308,6 +380,47 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             box-shadow: var(--glass-shadow);
+            position: relative;
+            overflow: hidden;
+            transition: 
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.35s ease,
+                border-color 0.35s ease,
+                background 0.35s ease;
+        }
+
+        .info-card::before {
+            content: "";
+            position: absolute;
+            width: 260px;
+            height: 260px;
+            top: -120px;
+            right: -100px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.22), transparent 68%);
+            transition: transform 0.6s ease, opacity 0.6s ease;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .info-card:hover {
+            transform: translateY(-6px);
+            background: rgba(255, 255, 255, 0.78);
+            border-color: rgba(56, 189, 248, 0.65);
+            box-shadow: 0 26px 60px rgba(2, 132, 199, 0.14);
+        }
+
+        .info-card:hover::before {
+            transform: scale(1.22) translate(-20px, 20px);
+            opacity: 1;
+        }
+
+        .info-card h2,
+        .info-card p,
+        .info-list,
+        .architecture-box,
+        .contact-button {
+            position: relative;
+            z-index: 1;
         }
 
         .info-card h2 {
@@ -337,6 +450,18 @@
             border-radius: 18px;
             background: rgba(240, 249, 255, 0.8);
             border: 1px solid rgba(186, 230, 253, 0.9);
+            transition: 
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.35s ease,
+                background 0.35s ease,
+                border-color 0.35s ease;
+        }
+
+        .info-item:hover {
+            transform: translateY(-6px);
+            background: rgba(255, 255, 255, 0.92);
+            border-color: rgba(56, 189, 248, 0.65);
+            box-shadow: 0 14px 30px rgba(2, 132, 199, 0.12);
         }
 
         .info-item strong {
@@ -359,6 +484,16 @@
             background: rgba(240, 249, 255, 0.75);
             border: 1px solid rgba(186, 230, 253, 0.95);
             box-shadow: 0 12px 30px rgba(2, 132, 199, 0.08);
+            transition: 
+                transform 0.35s ease,
+                box-shadow 0.35s ease,
+                border-color 0.35s ease;
+        }
+
+        .architecture-box:hover {
+            transform: translateY(-5px);
+            border-color: rgba(56, 189, 248, 0.7);
+            box-shadow: 0 18px 40px rgba(2, 132, 199, 0.13);
         }
 
         .architecture-box h3 {
@@ -389,6 +524,11 @@
             width: 100%;
             height: auto;
             object-fit: contain;
+            transition: transform 0.55s ease;
+        }
+
+        .architecture-box:hover .architecture-image-wrap img {
+            transform: scale(1.025);
         }
 
         .email-text {
@@ -431,6 +571,143 @@
             text-align: center;
             color: var(--text-muted);
             font-size: 0.9rem;
+        }
+
+        /* =========================================================
+           PPT 올라오기 스타일 스크롤 애니메이션
+           - 화면에 들어올 때마다 아래에서 위로 쫙 올라옴
+           - 화면 밖으로 나가면 다시 초기화되어 재진입 시 재생됨
+        ========================================================= */
+
+        .scroll-reveal {
+            opacity: 0;
+            transform: translate3d(0, 260px, 0) scale(0.94);
+            filter: blur(12px);
+            will-change: transform, opacity, filter;
+            pointer-events: none;
+        }
+
+        .scroll-reveal.reveal-left {
+            transform: translate3d(-100px, 260px, 0) scale(0.94);
+        }
+
+        .scroll-reveal.reveal-right {
+            transform: translate3d(100px, 260px, 0) scale(0.94);
+        }
+
+        .scroll-reveal.play {
+            animation: pptRiseUp 0.82s cubic-bezier(0.16, 1.25, 0.35, 1) both;
+            animation-delay: var(--delay, 0s);
+            pointer-events: auto;
+        }
+
+        .scroll-reveal.reveal-left.play {
+            animation-name: pptRiseUpLeft;
+        }
+
+        .scroll-reveal.reveal-right.play {
+            animation-name: pptRiseUpRight;
+        }
+
+        .fast-scroll .scroll-reveal.play {
+            animation-duration: 0.55s;
+        }
+
+        @keyframes pptRiseUp {
+            0% {
+                opacity: 0;
+                transform: translate3d(0, 280px, 0) scale(0.92);
+                filter: blur(14px);
+            }
+
+            55% {
+                opacity: 1;
+                transform: translate3d(0, -34px, 0) scale(1.035);
+                filter: blur(2px);
+            }
+
+            75% {
+                transform: translate3d(0, 12px, 0) scale(0.99);
+                filter: blur(0);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translate3d(0, 0, 0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        @keyframes pptRiseUpLeft {
+            0% {
+                opacity: 0;
+                transform: translate3d(-130px, 280px, 0) scale(0.92);
+                filter: blur(14px);
+            }
+
+            55% {
+                opacity: 1;
+                transform: translate3d(18px, -34px, 0) scale(1.035);
+                filter: blur(2px);
+            }
+
+            75% {
+                transform: translate3d(-6px, 12px, 0) scale(0.99);
+                filter: blur(0);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translate3d(0, 0, 0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        @keyframes pptRiseUpRight {
+            0% {
+                opacity: 0;
+                transform: translate3d(130px, 280px, 0) scale(0.92);
+                filter: blur(14px);
+            }
+
+            55% {
+                opacity: 1;
+                transform: translate3d(-18px, -34px, 0) scale(1.035);
+                filter: blur(2px);
+            }
+
+            75% {
+                transform: translate3d(6px, 12px, 0) scale(0.99);
+                filter: blur(0);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translate3d(0, 0, 0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            .scroll-reveal,
+            .scroll-reveal.play,
+            .card,
+            .info-card,
+            .info-item,
+            .architecture-box,
+            .architecture-image-wrap img,
+            .badge {
+                transition: none !important;
+                animation: none !important;
+                transform: none !important;
+                filter: none !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
         }
 
         @media (max-width: 768px) {
@@ -533,10 +810,20 @@
         </section>
 
         <section class="features">
-            <h2 class="section-title">정밀한 다중 클래스 탐지</h2>
+            <h2 
+                class="section-title scroll-reveal" 
+                data-motion="rise"
+                style="--delay: 0s;"
+            >
+                정밀한 다중 클래스 탐지
+            </h2>
 
             <div class="grid">
-                <div class="card">
+                <div 
+                    class="card tilt-card scroll-reveal reveal-left" 
+                    data-motion="rise"
+                    style="--delay: 0.02s;"
+                >
                     <span class="badge phishing">Phishing</span>
                     <h3>피싱 사이트 차단</h3>
                     <p>
@@ -544,7 +831,11 @@
                     </p>
                 </div>
 
-                <div class="card">
+                <div 
+                    class="card tilt-card scroll-reveal" 
+                    data-motion="rise"
+                    style="--delay: 0.10s;"
+                >
                     <span class="badge malware">Malware</span>
                     <h3>악성코드 유포지 탐지</h3>
                     <p>
@@ -552,7 +843,11 @@
                     </p>
                 </div>
 
-                <div class="card">
+                <div 
+                    class="card tilt-card scroll-reveal reveal-right" 
+                    data-motion="rise"
+                    style="--delay: 0.18s;"
+                >
                     <span class="badge safe">Safe Browsing</span>
                     <h3>안전한 브라우징 보장</h3>
                     <p>
@@ -563,7 +858,11 @@
         </section>
 
         <section id="about" class="info-section">
-            <div class="info-card">
+            <div 
+                class="info-card scroll-reveal" 
+                data-motion="rise"
+                style="--delay: 0s;"
+            >
                 <h2>About LinkWatcher</h2>
                 <p>
                     LinkWatcher는 사용자가 의심스러운 URL을 클릭하기 전에 위험 여부를 확인할 수 있도록 설계된 AI 기반 URL 탐지 웹서비스입니다.
@@ -571,15 +870,27 @@
                 </p>
 
                 <div class="info-list">
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.04s;"
+                    >
                         <strong>Purpose</strong>
                         <span>클릭 전 URL 위험도 확인</span>
                     </div>
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.10s;"
+                    >
                         <strong>Target</strong>
                         <span>피싱, 악성코드, 스팸, 정상 URL</span>
                     </div>
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.16s;"
+                    >
                         <strong>Project Type</strong>
                         <span>졸업작품 및 AI 보안 학과 프로젝트</span>
                     </div>
@@ -588,7 +899,11 @@
         </section>
 
         <section id="model" class="info-section">
-            <div class="info-card">
+            <div 
+                class="info-card scroll-reveal" 
+                data-motion="rise"
+                style="--delay: 0s;"
+            >
                 <h2>Detection Model</h2>
                 <p>
                     LinkWatcher의 탐지 모델은 URL 문자열에서 추출한 토큰, 도메인 구조, 경로 패턴, 의심 키워드 등의 특징을 기반으로
@@ -597,21 +912,37 @@
                 </p>
 
                 <div class="info-list">
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.04s;"
+                    >
                         <strong>Multiclass Classification</strong>
                         <span>Benign, Phishing, Malware, Spam URL 분류</span>
                     </div>
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.10s;"
+                    >
                         <strong>Risk Token Analysis</strong>
                         <span>URL 내 위험 토큰과 의심 패턴 분석</span>
                     </div>
-                    <div class="info-item">
+                    <div 
+                        class="info-item scroll-reveal" 
+                        data-motion="rise"
+                        style="--delay: 0.16s;"
+                    >
                         <strong>Explainable Output</strong>
                         <span>탐지 결과와 함께 판단 근거 제공</span>
                     </div>
                 </div>
 
-                <div class="architecture-box">
+                <div 
+                    class="architecture-box scroll-reveal" 
+                    data-motion="rise"
+                    style="--delay: 0.18s;"
+                >
                     <h3>Model Architecture</h3>
                     <p>
                         아래 구조도는 URL 입력부터 특징 추출, 다중 클래스 분류, 위험 토큰 기반 설명 출력까지 이어지는 LinkWatcher의 전체 분석 흐름을 나타냅니다.
@@ -625,20 +956,30 @@
         </section>
 
         <section id="contact" class="info-section">
-            <div class="info-card">
+            <div 
+                class="info-card scroll-reveal" 
+                data-motion="rise"
+                style="--delay: 0s;"
+            >
                 <h2>Contact</h2>
                 <p>
                     LinkWatcher 프로젝트에 대한 문의, 피드백, 기술적 질문이 있다면 아래 메일로 연락할 수 있습니다.
                     이 프로젝트는 AI 기반 URL 위험 탐지와 설명 가능한 보안 분석을 목표로 개발되었습니다.
                 </p>
 
-                <p class="email-text">
+                <p 
+                    class="email-text scroll-reveal" 
+                    data-motion="rise"
+                    style="--delay: 0.06s;"
+                >
                     Email: <a href="mailto:alsrl030902@dankook.ac.kr">alsrl030902@dankook.ac.kr</a>
                 </p>
 
                 <a 
                     href="mailto:alsrl030902@dankook.ac.kr?subject=LinkWatcher Project Inquiry" 
-                    class="contact-button"
+                    class="contact-button scroll-reveal"
+                    data-motion="rise"
+                    style="--delay: 0.12s;"
                 >
                     Send Email
                 </a>
@@ -733,6 +1074,126 @@
                 resultBox.style.display = 'block';
             }, 1200);
         }
+
+        /*
+            PPT 올라오기 스타일 스크롤 애니메이션
+            - 요소가 화면에 들어오면 아래에서 위로 크게 올라옴
+            - 요소가 화면 밖으로 완전히 나가면 다시 초기화됨
+            - 다시 들어오면 애니메이션 재실행
+        */
+        const motionElements = document.querySelectorAll('[data-motion="rise"]');
+
+        const playRiseAnimation = (element) => {
+            if (element.dataset.motionVisible === 'true') return;
+
+            element.dataset.motionVisible = 'true';
+            element.classList.add('scroll-reveal');
+            element.classList.remove('play');
+
+            void element.offsetWidth;
+
+            element.classList.add('play');
+
+            const handleAnimationEnd = () => {
+                element.classList.remove('play');
+                element.classList.remove('scroll-reveal');
+                element.removeEventListener('animationend', handleAnimationEnd);
+            };
+
+            element.addEventListener('animationend', handleAnimationEnd);
+        };
+
+        const resetRiseAnimation = (element) => {
+            element.dataset.motionVisible = 'false';
+            element.classList.remove('play');
+            element.classList.add('scroll-reveal');
+        };
+
+        const riseObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                const element = entry.target;
+                const rect = entry.boundingClientRect;
+                const isFullyOut = rect.bottom < 0 || rect.top > window.innerHeight;
+
+                if (entry.isIntersecting) {
+                    playRiseAnimation(element);
+                } else if (isFullyOut) {
+                    resetRiseAnimation(element);
+                }
+            });
+        }, {
+            threshold: 0.12,
+            rootMargin: '0px 0px -10% 0px'
+        });
+
+        motionElements.forEach((element) => {
+            element.dataset.motionVisible = 'false';
+            riseObserver.observe(element);
+        });
+
+        /*
+            빠르게 스크롤할 때 애니메이션 속도를 조금 더 빠르게
+        */
+        let lastScrollY = window.scrollY;
+        let lastScrollTime = performance.now();
+        let scrollTimer = null;
+
+        window.addEventListener('scroll', () => {
+            const now = performance.now();
+            const currentY = window.scrollY;
+
+            const distance = Math.abs(currentY - lastScrollY);
+            const time = now - lastScrollTime;
+            const speed = distance / Math.max(time, 1);
+
+            if (speed > 1.0) {
+                document.documentElement.classList.add('fast-scroll');
+            }
+
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+                document.documentElement.classList.remove('fast-scroll');
+            }, 140);
+
+            lastScrollY = currentY;
+            lastScrollTime = now;
+        }, { passive: true });
+
+        /*
+            카드 3D Tilt 효과
+            - 마우스 위치에 따라 카드가 살짝 기울어짐
+        */
+        const tiltCards = document.querySelectorAll('.tilt-card');
+
+        tiltCards.forEach((card) => {
+            card.addEventListener('mousemove', (event) => {
+                const rect = card.getBoundingClientRect();
+
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+
+                const rotateX = ((centerY - y) / centerY) * 5;
+                const rotateY = ((x - centerX) / centerX) * 5;
+
+                const mouseXPercent = (x / rect.width) * 100;
+                const mouseYPercent = (y / rect.height) * 100;
+
+                card.style.setProperty('--rotate-x', `${rotateX}deg`);
+                card.style.setProperty('--rotate-y', `${rotateY}deg`);
+                card.style.setProperty('--mouse-x', `${mouseXPercent}%`);
+                card.style.setProperty('--mouse-y', `${mouseYPercent}%`);
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.setProperty('--rotate-x', '0deg');
+                card.style.setProperty('--rotate-y', '0deg');
+                card.style.setProperty('--mouse-x', '50%');
+                card.style.setProperty('--mouse-y', '50%');
+            });
+        });
     </script>
 </body>
 </html>
