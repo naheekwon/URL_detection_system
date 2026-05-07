@@ -1,0 +1,73 @@
+{
+  "model_family": "base_4class_streaming_detector_plus_char_transformer_phishing_specialist",
+  "url_col": "url",
+  "label_col": "type",
+  "class_names": [
+    "benign",
+    "defacement",
+    "malware",
+    "phishing"
+  ],
+  "malicious_classes": [
+    "defacement",
+    "malware",
+    "phishing"
+  ],
+  "benign_label": "benign",
+  "phishing_label": "phishing",
+  "benign_id": 0,
+  "phishing_id": 3,
+  "risk_feature_order": {
+    "common": [
+      "common_score",
+      "common_count"
+    ],
+    "per_malicious_class": [
+      "defacement",
+      "malware",
+      "phishing"
+    ],
+    "per_class_features": [
+      "class_score",
+      "class_count"
+    ]
+  },
+  "tfidf_config": {
+    "max_features": 50000,
+    "min_df": 3,
+    "max_df": 0.95,
+    "lowercase": false,
+    "token_pattern": null
+  },
+  "fixed_phishing_gate": {
+    "demote_prob": 0.55,
+    "demote_margin": 0.08
+  },
+  "transformer_config": {
+    "use_phishing_transformer": true,
+    "max_char_len": 256,
+    "max_train_samples": 60000,
+    "epochs": 2,
+    "batch_size": 256,
+    "embed_dim": 64,
+    "nhead": 4,
+    "num_layers": 2,
+    "ff_dim": 128,
+    "dropout": 0.1,
+    "gray_zone_margin": 0.2,
+    "min_base_phishing_prob_for_specialist": 0.25,
+    "phishing_threshold": 0.6,
+    "benign_threshold": 0.35
+  },
+  "artifact_files": {
+    "base_model": "base_model.joblib",
+    "vectorizer": "vectorizer.joblib",
+    "scaler": "scaler.joblib",
+    "label_encoder": "label_encoder.joblib",
+    "risk_dict": "risk_dict.json",
+    "char_vocab": "char_vocab.json",
+    "transformer_state": "transformer_state.pt",
+    "config": "config.json"
+  },
+  "note": "These artifacts are intended for Flask inference. The API code must reuse the same tokenizer, lexical feature, risk feature, character encoder, and CharTransformerPhishingModel definitions as transformer_final.py."
+}

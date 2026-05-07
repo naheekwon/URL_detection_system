@@ -1,9 +1,0 @@
-{
-  "title": "Final Adaptive Model on Final Test - RAW",
-  "accuracy": 0.9273948340994482,
-  "macro_f1": 0.897656716287162,
-  "weighted_f1": 0.9289933290975291,
-  "use_phishing_gate": false,
-  "phishing_min_prob": null,
-  "phishing_min_margin": null
-}

@@ -1,9 +1,0 @@
-{
-  "demote_prob": 0.6,
-  "demote_margin": 0.0,
-  "promote_prob": 0.25,
-  "promote_margin": 0.0,
-  "objective": 0.7485387163994613,
-  "phishing_f1": 0.7573237634014419,
-  "benign_to_phishing_rate": 0.05856698001320379
-}
