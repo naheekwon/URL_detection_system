@@ -1,11 +1,11 @@
-# 🔗 LinkWatcher
+# LinkWatcher
 
 > AI 기반 다중 클래스 악성 URL 탐지 웹서비스  
 > Multi-Class Malicious URL Detection with Adaptive Risk Token Dictionary
 
 <br/>
 
-## 📌 프로젝트 개요
+## 프로젝트 개요
 
 **LinkWatcher**는 URL 문자열을 분석하여 정상 URL과 악성 URL을 분류하는 AI 기반 URL 위험 탐지 웹서비스입니다.
 
@@ -18,7 +18,7 @@
 
 <br/>
 
-## 🏗️ 시스템 아키텍처
+## 시스템 아키텍처
 
 <img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
 
