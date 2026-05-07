@@ -1,9 +1,0 @@
-{
-  "title": "Final Adaptive Model on Final Test - Phishing Gate",
-  "accuracy": 0.9322781764760082,
-  "macro_f1": 0.8993178059619276,
-  "weighted_f1": 0.9328719576088843,
-  "use_phishing_gate": true,
-  "phishing_min_prob": 0.55,
-  "phishing_min_margin": 0.08
-}
