@@ -16,6 +16,7 @@ from scipy.sparse import csr_matrix, hstack
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACT_DIR = os.path.join(PROJECT_DIR, "artifacts_transformer")
+META_GATE_ARTIFACT_DIR = os.path.join(PROJECT_DIR, "artifacts_phiusiil_meta_gate")
 FRONTEND_DIR = os.path.join(PROJECT_DIR, "frontend")
 
 PAD_ID = 0
@@ -514,6 +515,11 @@ def load_json(filename):
         return json.load(f)
 
 
+def load_json_from_dir(directory, filename):
+    with open(os.path.join(directory, filename), "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def require_artifacts():
     required = [
         "base_model.joblib",
@@ -572,7 +578,44 @@ def load_artifacts():
     return loaded
 
 
+def load_meta_gate_artifacts():
+    required = [
+        "meta_gate.joblib",
+        "meta_gate_scaler.joblib",
+        "config.json",
+    ]
+
+    if not os.path.isdir(META_GATE_ARTIFACT_DIR):
+        return {
+            "enabled": False,
+            "reason": "meta_gate_artifact_dir_not_found",
+        }
+
+    missing = [
+        name for name in required
+        if not os.path.exists(os.path.join(META_GATE_ARTIFACT_DIR, name))
+    ]
+
+    if missing:
+        return {
+            "enabled": False,
+            "reason": "missing_meta_gate_artifacts",
+            "missing": missing,
+        }
+
+    cfg = load_json_from_dir(META_GATE_ARTIFACT_DIR, "config.json")
+
+    return {
+        "enabled": True,
+        "config": cfg,
+        "meta_gate": joblib.load(os.path.join(META_GATE_ARTIFACT_DIR, "meta_gate.joblib")),
+        "meta_gate_scaler": joblib.load(os.path.join(META_GATE_ARTIFACT_DIR, "meta_gate_scaler.joblib")),
+        "threshold": float(cfg["threshold"]),
+    }
+
+
 ARTIFACTS = load_artifacts()
+META_GATE_ARTIFACTS = load_meta_gate_artifacts()
 config = ARTIFACTS["config"]
 base_model = ARTIFACTS["base_model"]
 vectorizer = ARTIFACTS["vectorizer"]
@@ -581,6 +624,11 @@ label_encoder = ARTIFACTS["label_encoder"]
 risk_dict = ARTIFACTS["risk_dict"]
 char_vocab = ARTIFACTS["char_vocab"]
 transformer_model = ARTIFACTS["transformer_model"]
+meta_gate_enabled = bool(META_GATE_ARTIFACTS.get("enabled"))
+meta_gate = META_GATE_ARTIFACTS.get("meta_gate")
+meta_gate_scaler = META_GATE_ARTIFACTS.get("meta_gate_scaler")
+meta_gate_config = META_GATE_ARTIFACTS.get("config", {})
+meta_gate_threshold = META_GATE_ARTIFACTS.get("threshold")
 
 class_names = config["class_names"]
 malicious_classes = config["malicious_classes"]
@@ -640,9 +688,91 @@ def predict_transformer_phishing_probs(urls):
     return probs.detach().cpu().numpy().astype(np.float32)
 
 
+def url_policy_features(urls):
+    rows = []
+
+    for url in urls:
+        u = clean_url_text(url)
+        parsed = safe_parse_url(u)
+        host = get_normalized_host(u)
+        path = parsed.path or "" if parsed is not None else ""
+        query = parsed.query or "" if parsed is not None else ""
+        domain_parts = [p for p in host.split(".") if p]
+
+        known_safe_domain = matched_known_safe_domain(host)
+        known_safe_risky = has_strong_known_safe_risk_signal(u)
+
+        rows.append([
+            float(len(u)),
+            float(len(host)),
+            float(len(path)),
+            float(len(query)),
+            float(u.count(".")),
+            float(u.count("-")),
+            float(u.count("_")),
+            float(u.count("@")),
+            float(u.count("%")),
+            float(u.count("=")),
+            float(u.count("&")),
+            float(len(domain_parts)),
+            1.0 if query else 0.0,
+            1.0 if path and path != "/" else 0.0,
+            1.0 if (not path or path == "/") and not query else 0.0,
+            1.0 if len(u) <= 35 else 0.0,
+            1.0 if len(u) <= 50 else 0.0,
+            1.0 if known_safe_domain is not None else 0.0,
+            1.0 if known_safe_risky else 0.0,
+            1.0 if host.endswith(".ac.kr") or host.endswith(".edu") else 0.0,
+            1.0 if host.endswith(".go.kr") or host.endswith(".gov") else 0.0,
+            1.0 if host.endswith(".co.kr") else 0.0,
+        ])
+
+    return np.array(rows, dtype=np.float32)
+
+
+def build_meta_gate_features(urls, base_proba, raw_base_pred, transformer_probs):
+    sorted_probs = np.sort(base_proba, axis=1)
+    top_margin = sorted_probs[:, -1] - sorted_probs[:, -2]
+    policy = url_policy_features(urls)
+
+    rows = []
+
+    for i in range(len(urls)):
+        base_benign = float(base_proba[i][benign_id])
+        base_phishing = float(base_proba[i][phishing_id])
+        transformer_phishing = float(transformer_probs[i])
+
+        row = [
+            base_benign,
+            base_phishing,
+            base_phishing - base_benign,
+            abs(base_phishing - base_benign),
+            float(np.max(base_proba[i])),
+            float(top_margin[i]),
+            1.0 if raw_base_pred[i] == benign_id else 0.0,
+            1.0 if raw_base_pred[i] == phishing_id else 0.0,
+            transformer_phishing,
+            transformer_phishing - base_phishing,
+            abs(transformer_phishing - base_phishing),
+        ]
+        row.extend(policy[i].tolist())
+        rows.append(row)
+
+    x_meta = np.array(rows, dtype=np.float32)
+
+    expected_count = meta_gate_config.get("feature_count")
+    if expected_count is not None and x_meta.shape[1] != int(expected_count):
+        raise ValueError(
+            f"Meta-gate feature count mismatch: expected {expected_count}, got {x_meta.shape[1]}"
+        )
+
+    return x_meta
+
+
 def hybrid_predict(urls):
     x = build_features(urls)
     base_proba = base_model.predict_proba(x)
+    raw_base_pred = np.argmax(base_proba, axis=1)
     base_pred = apply_fixed_phishing_gate(base_proba)
     final_pred = np.array(base_pred, copy=True)
 
@@ -683,6 +813,71 @@ def hybrid_predict(urls):
                     demote_count += 1
                 final_pred[global_idx] = benign_id
 
+    meta_scores_by_index = {}
+    meta_transformer_probs_by_index = {}
+    meta_used_count = 0
+    meta_to_phishing_count = 0
+    meta_to_benign_count = 0
+
+    if meta_gate_enabled:
+        meta_candidate_mask = (
+            (raw_base_pred == benign_id)
+            | (raw_base_pred == phishing_id)
+            | (final_pred == benign_id)
+            | (final_pred == phishing_id)
+        )
+        meta_candidate_indices = np.where(meta_candidate_mask)[0]
+        meta_used_count = int(len(meta_candidate_indices))
+
+        if len(meta_candidate_indices) > 0:
+            meta_candidate_urls = [urls[i] for i in meta_candidate_indices]
+            meta_candidate_base_proba = base_proba[meta_candidate_indices]
+            meta_candidate_raw_base_pred = raw_base_pred[meta_candidate_indices]
+            meta_transformer_probs = []
+
+            missing_transformer_url_indices = []
+            missing_transformer_urls = []
+
+            for global_idx in meta_candidate_indices:
+                global_idx_int = int(global_idx)
+                if global_idx_int in transformer_probs_by_index:
+                    meta_transformer_probs.append(transformer_probs_by_index[global_idx_int])
+                else:
+                    meta_transformer_probs.append(None)
+                    missing_transformer_url_indices.append(len(meta_transformer_probs) - 1)
+                    missing_transformer_urls.append(urls[global_idx_int])
+
+            if missing_transformer_urls:
+                computed_probs = predict_transformer_phishing_probs(missing_transformer_urls)
+                for local_missing_idx, computed_prob in zip(missing_transformer_url_indices, computed_probs):
+                    meta_transformer_probs[local_missing_idx] = float(computed_prob)
+
+            meta_transformer_probs = np.array(meta_transformer_probs, dtype=np.float32)
+
+            x_meta = build_meta_gate_features(
+                urls=meta_candidate_urls,
+                base_proba=meta_candidate_base_proba,
+                raw_base_pred=meta_candidate_raw_base_pred,
+                transformer_probs=meta_transformer_probs,
+            )
+            x_meta_scaled = meta_gate_scaler.transform(x_meta)
+            meta_scores = meta_gate.predict_proba(x_meta_scaled)[:, 1]
+
+            for local_idx, global_idx in enumerate(meta_candidate_indices):
+                global_idx_int = int(global_idx)
+                old_pred = final_pred[global_idx_int]
+                meta_score = float(meta_scores[local_idx])
+                meta_scores_by_index[global_idx_int] = meta_score
+                meta_transformer_probs_by_index[global_idx_int] = float(meta_transformer_probs[local_idx])
+
+                # In the web service, the PhiUSIIL meta-gate is used
+                # conservatively to reduce benign -> phishing false alarms.
+                # It can demote an existing phishing decision to benign, but
+                # it does not newly promote benign URLs to phishing.
+                if old_pred == phishing_id and meta_score < meta_gate_threshold:
+                    final_pred[global_idx_int] = benign_id
+                    meta_to_benign_count += 1
+
     results = []
 
     for idx, url in enumerate(urls):
@@ -694,6 +889,9 @@ def hybrid_predict(urls):
         }
         confidence = float(max(class_probabilities.values()))
         transformer_phishing_probability = transformer_probs_by_index.get(idx)
+        meta_transformer_probability = meta_transformer_probs_by_index.get(idx)
+        if transformer_phishing_probability is None:
+            transformer_phishing_probability = meta_transformer_probability
 
         result = {
             "url": url,
@@ -704,6 +902,10 @@ def hybrid_predict(urls):
             "class_probabilities": class_probabilities,
             "transformer_used": transformer_phishing_probability is not None,
             "transformer_phishing_probability": transformer_phishing_probability,
+            "meta_gate_used": idx in meta_scores_by_index,
+            "meta_gate_phishing_score": meta_scores_by_index.get(idx),
+            "meta_gate_threshold": meta_gate_threshold if meta_gate_enabled else None,
+            "meta_gate_enabled": meta_gate_enabled,
         }
 
         results.append(apply_known_safe_domain_guard(result))
@@ -712,6 +914,10 @@ def hybrid_predict(urls):
         "transformer_used_count": int(len(candidate_indices)),
         "transformer_promote_count": int(promote_count),
         "transformer_demote_count": int(demote_count),
+        "meta_gate_enabled": meta_gate_enabled,
+        "meta_gate_used_count": int(meta_used_count),
+        "meta_gate_to_phishing_count": int(meta_to_phishing_count),
+        "meta_gate_to_benign_count": int(meta_to_benign_count),
     }
 
     return results, stats
@@ -729,6 +935,10 @@ def health():
         "model_family": config["model_family"],
         "classes": class_names,
         "artifact_dir": ARTIFACT_DIR,
+        "meta_gate_enabled": meta_gate_enabled,
+        "meta_gate_artifact_dir": META_GATE_ARTIFACT_DIR,
+        "meta_gate_model_family": meta_gate_config.get("model_family"),
+        "meta_gate_threshold": meta_gate_threshold,
     })
 
 
