@@ -1,0 +1,56 @@
+{
+  "model_family": "posthoc_phiusiil_benign_phishing_meta_gate",
+  "source_artifact_dir": "C:\\Users\\CSOS\\Desktop\\졸업작품_나희\\phishing-url-detection\\artifacts_transformer",
+  "source_app": "app.py",
+  "threshold": 0.7000000000000002,
+  "feature_names": [
+    "base_benign_prob",
+    "base_phishing_prob",
+    "base_phishing_minus_benign",
+    "base_benign_phishing_margin",
+    "base_top_prob",
+    "base_top_margin",
+    "base_pred_is_benign",
+    "base_pred_is_phishing",
+    "transformer_phishing_prob",
+    "transformer_minus_base_phishing",
+    "transformer_base_abs_gap",
+    "url_length",
+    "host_length",
+    "path_length",
+    "query_length",
+    "dot_count",
+    "hyphen_count",
+    "underscore_count",
+    "at_count",
+    "percent_count",
+    "equal_count",
+    "amp_count",
+    "domain_part_count",
+    "has_query",
+    "has_path",
+    "root_or_empty_path",
+    "short_url_le35",
+    "short_url_le50",
+    "known_safe_domain_flag",
+    "known_safe_risky_signal",
+    "education_tld_flag",
+    "government_tld_flag",
+    "korea_company_tld_flag"
+  ],
+  "feature_count": 33,
+  "label_mapping": {
+    "0": "benign",
+    "1": "phishing"
+  },
+  "phiusiil_label_mapping": {
+    "1": "benign",
+    "0": "phishing"
+  },
+  "artifact_files": {
+    "meta_gate": "meta_gate.joblib",
+    "meta_gate_scaler": "meta_gate_scaler.joblib",
+    "config": "config.json"
+  },
+  "integration_note": "To integrate with app.py later, load meta_gate/meta_gate_scaler after the existing base/Transformer prediction, recreate the same meta features, and apply score >= threshold only for benign/phishing candidate decisions."
+}
