@@ -13,69 +13,24 @@ import torch.nn as nn
 from flask import Flask, jsonify, request, send_from_directory
 from scipy.sparse import csr_matrix, hstack
 
+from evidence_detector import classify_with_evidence
+from page_evidence import inspect_url_page
+from xai import (
+    build_xai_explanation,
+    compute_transformer_lexicon_alignment,
+    load_case_index,
+)
+
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACT_DIR = os.path.join(PROJECT_DIR, "artifacts_transformer")
 META_GATE_ARTIFACT_DIR = os.path.join(PROJECT_DIR, "artifacts_phiusiil_meta_gate")
 FRONTEND_DIR = os.path.join(PROJECT_DIR, "frontend")
+DATASET_PATH = os.path.join(os.path.dirname(PROJECT_DIR), "PhiUSIIL_Phishing_URL_Dataset.csv")
 
 PAD_ID = 0
 UNK_ID = 1
 CLS_ID = 2
-
-KNOWN_SAFE_DOMAINS = {
-    "google.com",
-    "naver.com",
-    "11st.co.kr",
-    "safebrowsing.google.com",
-    "youtube.com",
-    "gmail.com",
-    "microsoft.com",
-    "office.com",
-    "apple.com",
-    "icloud.com",
-    "kakao.com",
-    "daum.net",
-    "github.com",
-    "amazon.com",
-    "facebook.com",
-    "instagram.com",
-    "netflix.com",
-    "wikipedia.org",
-}
-
-KNOWN_SAFE_STRONG_RISK_WORDS = {
-    "login",
-    "signin",
-    "verify",
-    "verification",
-    "account",
-    "password",
-    "passwd",
-    "credential",
-    "wallet",
-    "billing",
-    "payment",
-    "secure",
-    "security",
-    "update",
-    "confirm",
-    "unlock",
-    "suspended",
-}
-
-KNOWN_SAFE_RISK_EXTENSIONS = {
-    "exe",
-    "scr",
-    "bat",
-    "cmd",
-    "msi",
-    "apk",
-    "jar",
-    "vbs",
-    "ps1",
-}
-
 
 def clean_url_text(url):
     if url is None:
@@ -154,85 +109,6 @@ def get_normalized_host(url):
         host = host[4:]
 
     return host.strip(".")
-
-
-def is_same_or_subdomain(host, domain):
-    host = host.lower().strip(".")
-    domain = domain.lower().strip(".")
-
-    return host == domain or host.endswith("." + domain)
-
-
-def matched_known_safe_domain(host):
-    if not host:
-        return None
-
-    matches = [
-        domain for domain in KNOWN_SAFE_DOMAINS
-        if is_same_or_subdomain(host, domain)
-    ]
-
-    if not matches:
-        return None
-
-    return max(matches, key=len)
-
-
-def has_strong_known_safe_risk_signal(url):
-    cleaned = clean_url_text(url)
-    parsed = safe_parse_url(cleaned)
-
-    path = parsed.path.lower() if parsed is not None and parsed.path else ""
-    query = parsed.query.lower() if parsed is not None and parsed.query else ""
-    path_query = path + " " + query
-
-    parts = split_by_separators(path_query)
-    token_set = set(parts)
-
-    if token_set & KNOWN_SAFE_STRONG_RISK_WORDS:
-        return True
-
-    if "@" in cleaned or "%" in cleaned:
-        return True
-
-    if cleaned.count("//") >= 2:
-        return True
-
-    path_segments = [seg for seg in path.split("/") if seg]
-    if path_segments:
-        last = path_segments[-1]
-        if "." in last:
-            ext = last.rsplit(".", 1)[-1]
-            if ext in KNOWN_SAFE_RISK_EXTENSIONS:
-                return True
-
-    return False
-
-
-def apply_known_safe_domain_guard(result):
-    host = get_normalized_host(result["url"])
-    safe_domain = matched_known_safe_domain(host)
-
-    result["known_safe_domain"] = safe_domain
-    result["known_safe_guard_applied"] = False
-
-    if safe_domain is None:
-        return result
-
-    if has_strong_known_safe_risk_signal(result["url"]):
-        result["known_safe_guard_reason"] = "known_safe_domain_but_risky_path_or_query"
-        return result
-
-    if result["prediction"] != config["benign_label"]:
-        result["prediction_before_known_safe_guard"] = result["prediction"]
-        result["prediction"] = config["benign_label"]
-        result["is_malicious"] = False
-        result["known_safe_guard_applied"] = True
-        result["known_safe_guard_reason"] = "trusted_domain_without_strong_risk_signal"
-    else:
-        result["known_safe_guard_reason"] = "already_benign"
-
-    return result
 
 
 def tokenize_url(url):
@@ -616,6 +492,7 @@ def load_meta_gate_artifacts():
 
 ARTIFACTS = load_artifacts()
 META_GATE_ARTIFACTS = load_meta_gate_artifacts()
+XAI_CASE_INDEX = load_case_index(DATASET_PATH, safe_tokenize)
 config = ARTIFACTS["config"]
 base_model = ARTIFACTS["base_model"]
 vectorizer = ARTIFACTS["vectorizer"]
@@ -638,6 +515,7 @@ transformer_config = config["transformer_config"]
 fixed_gate_config = config["fixed_phishing_gate"]
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 
 @app.after_request
@@ -645,6 +523,11 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.cache_control.no_store = True
+    response.cache_control.no_cache = True
+    response.cache_control.must_revalidate = True
+    response.cache_control.max_age = 0
+    response.headers["Pragma"] = "no-cache"
     return response
 
 
@@ -699,9 +582,6 @@ def url_policy_features(urls):
         query = parsed.query or "" if parsed is not None else ""
         domain_parts = [p for p in host.split(".") if p]
 
-        known_safe_domain = matched_known_safe_domain(host)
-        known_safe_risky = has_strong_known_safe_risk_signal(u)
-
         rows.append([
             float(len(u)),
             float(len(host)),
@@ -720,8 +600,8 @@ def url_policy_features(urls):
             1.0 if (not path or path == "/") and not query else 0.0,
             1.0 if len(u) <= 35 else 0.0,
             1.0 if len(u) <= 50 else 0.0,
-            1.0 if known_safe_domain is not None else 0.0,
-            1.0 if known_safe_risky else 0.0,
+            0.0,
+            0.0,
             1.0 if host.endswith(".ac.kr") or host.endswith(".edu") else 0.0,
             1.0 if host.endswith(".go.kr") or host.endswith(".gov") else 0.0,
             1.0 if host.endswith(".co.kr") else 0.0,
@@ -769,7 +649,7 @@ def build_meta_gate_features(urls, base_proba, raw_base_pred, transformer_probs)
     return x_meta
 
 
-def hybrid_predict(urls):
+def hybrid_predict(urls, inspect_pages=False, include_debug=False):
     x = build_features(urls)
     base_proba = base_model.predict_proba(x)
     raw_base_pred = np.argmax(base_proba, axis=1)
@@ -893,8 +773,7 @@ def hybrid_predict(urls):
         if transformer_phishing_probability is None:
             transformer_phishing_probability = meta_transformer_probability
 
-        result = {
-            "url": url,
+        raw_model_debug = {
             "prediction": final_label,
             "is_malicious": final_label != config["benign_label"],
             "confidence": confidence,
@@ -908,7 +787,54 @@ def hybrid_predict(urls):
             "meta_gate_enabled": meta_gate_enabled,
         }
 
-        results.append(apply_known_safe_domain_guard(result))
+        result = {
+            "url": url,
+            "prediction": final_label,
+            "is_malicious": final_label != config["benign_label"],
+            "confidence": confidence,
+        }
+
+        if inspect_pages:
+            result["page_evidence"] = inspect_url_page(url)
+
+        transformer_alignment = compute_transformer_lexicon_alignment(
+            url=url,
+            risk_dict=risk_dict,
+            tokenizer=safe_tokenize,
+            transformer_model=transformer_model,
+            encode_url_chars=encode_url_chars,
+            char_vocab=char_vocab,
+            max_char_len=transformer_config["max_char_len"],
+        )
+
+        evidence_decision = classify_with_evidence(
+            url=url,
+            page_evidence=result.get("page_evidence"),
+            learned_risk_dict=risk_dict,
+            transformer_alignment=transformer_alignment,
+        )
+        result["evidence_decision"] = evidence_decision
+        result["prediction"] = evidence_decision["prediction"]
+        result["is_malicious"] = evidence_decision["is_malicious"]
+        result["confidence"] = evidence_decision["confidence"]
+        result["model_method"] = evidence_decision["method"]
+
+        result["xai"] = build_xai_explanation(
+            url=url,
+            prediction_result=result,
+            risk_dict=risk_dict,
+            tokenizer=safe_tokenize,
+            transformer_model=transformer_model,
+            encode_url_chars=encode_url_chars,
+            char_vocab=char_vocab,
+            max_char_len=transformer_config["max_char_len"],
+            case_index=XAI_CASE_INDEX,
+        )
+
+        if include_debug:
+            result["debug_raw_url_model"] = raw_model_debug
+
+        results.append(result)
 
     stats = {
         "transformer_used_count": int(len(candidate_indices)),
@@ -965,7 +891,13 @@ def predict():
         }), 400
 
     try:
-        results, stats = hybrid_predict(urls)
+        inspect_pages = bool(payload.get("inspect_page", True))
+        include_debug = bool(payload.get("debug", False))
+        results, stats = hybrid_predict(
+            urls,
+            inspect_pages=inspect_pages,
+            include_debug=include_debug,
+        )
     except Exception as exc:
         return jsonify({
             "error": "prediction_failed",

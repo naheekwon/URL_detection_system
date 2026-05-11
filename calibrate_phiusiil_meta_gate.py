@@ -224,9 +224,6 @@ def url_policy_features(urls):
         query = parsed.query or ""
         domain_parts = [p for p in host.split(".") if p]
 
-        known_safe_domain = inference_app.matched_known_safe_domain(host)
-        known_safe_risky = inference_app.has_strong_known_safe_risk_signal(u)
-
         rows.append([
             float(len(u)),
             float(len(host)),
@@ -245,8 +242,8 @@ def url_policy_features(urls):
             1.0 if (not path or path == "/") and not query else 0.0,
             1.0 if len(u) <= 35 else 0.0,
             1.0 if len(u) <= 50 else 0.0,
-            1.0 if known_safe_domain is not None else 0.0,
-            1.0 if known_safe_risky else 0.0,
+            0.0,
+            0.0,
             1.0 if host.endswith(".ac.kr") or host.endswith(".edu") else 0.0,
             1.0 if host.endswith(".go.kr") or host.endswith(".gov") else 0.0,
             1.0 if host.endswith(".co.kr") else 0.0,
@@ -355,8 +352,8 @@ META_FEATURE_NAMES = [
     "root_or_empty_path",
     "short_url_le35",
     "short_url_le50",
-    "known_safe_domain_flag",
-    "known_safe_risky_signal",
+    "deprecated_safe_domain_flag",
+    "deprecated_safe_domain_risky_signal",
     "education_tld_flag",
     "government_tld_flag",
     "korea_company_tld_flag",
