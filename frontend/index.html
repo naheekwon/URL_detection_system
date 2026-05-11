@@ -239,6 +239,26 @@
             animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        .xai-detail-button {
+            margin-top: 14px;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 18px;
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .xai-detail-button:hover {
+            transform: translateY(-1px);
+            background: #1e293b;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22);
+        }
+
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
@@ -801,13 +821,148 @@
                         placeholder="분석할 URL을 붙여넣으세요 (예: example.com)" 
                         autocomplete="off"
                     >
-                    <button onclick="scanUrl()">분석하기</button>
+                    <button onclick="robustScanUrl()">분석하기</button>
                 </div>
 
                 <div class="loader" id="loader">AI 모델이 URL의 위험 패턴을 분석 중입니다...</div>
                 <div class="result-box" id="resultBox"></div>
             </div>
         </section>
+
+        <script>
+            window.latestPredictionData = null;
+
+            window.robustOpenXaiDetail = function() {
+                if (!window.latestPredictionData) {
+                    alert("XAI 상세 결과가 아직 없습니다.");
+                    return;
+                }
+
+                var data = window.latestPredictionData;
+                var xai = data.xai || {};
+                var evidence = data.evidence_decision || {};
+                var page = data.page_evidence || {};
+                var detail = window.open("", "linkwatcher-xai-detail", "width=980,height=760,scrollbars=yes,resizable=yes");
+
+                if (!detail) {
+                    alert("팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.");
+                    return;
+                }
+
+                function esc(value) {
+                    return String(value == null ? "" : value)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;");
+                }
+
+                function row(label, value) {
+                    return "<tr><td>" + esc(label) + "</td><td>" + esc(value) + "</td></tr>";
+                }
+
+                var html = "";
+                html += "<!doctype html><html lang='ko'><head><meta charset='utf-8'>";
+                html += "<title>LinkWatcher XAI Detail</title>";
+                html += "<style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#0f172a;padding:28px}main{max-width:1000px;margin:auto}section{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin:14px 0}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #e2e8f0;padding:10px;text-align:left;vertical-align:top}.summary{background:#eff6ff;border-color:#bae6fd}code{display:inline-block;background:#f1f5f9;padding:8px;border-radius:6px;margin:4px 0}</style>";
+                html += "</head><body><main>";
+                html += "<h1>Lexicon-Context Evidence XAI</h1>";
+                html += "<p>" + esc(data.url) + "</p>";
+                html += "<section class='summary'><strong>Summary</strong><br>" + esc(xai.summary || "") + "</section>";
+                html += "<section><h2>Decision</h2><table>";
+                html += row("Final decision", data.prediction);
+                html += row("Model method", data.model_method || "Lexicon-Context Evidence Model");
+                html += row("Model confidence", Math.round((data.confidence || 0) * 1000) / 10 + "%");
+                html += "</table></section>";
+                html += "<section><h2>Integrated evidence score</h2><code>" + esc(evidence.formula || "") + "</code><table>";
+                html += row("risk_score", evidence.risk_score);
+                html += row("url_score", evidence.url_score);
+                html += row("transformer_alignment_score", evidence.transformer_alignment_score);
+                html += row("page_score", evidence.page_score);
+                html += row("url_reasons", (evidence.url_reasons || []).join(" "));
+                html += row("page_reasons", (evidence.page_reasons || []).join(" "));
+                html += "</table></section>";
+                html += "<section><h2>Live page evidence</h2><table>";
+                ["fetched","final_url","status_code","title","form_count","password_input_count","external_form_action_count","iframe_count","js_obfuscation_score","ssl_checked","ssl_issuer","ssl_days_until_expiry","ssl_host_matches_cert","error"].forEach(function(key) {
+                    var rowHtml = row(key, page[key]);
+                    html += rowHtml;
+                });
+                html += "</table></section>";
+                html += "</main></body></html>";
+                detail.document.open();
+                detail.document.write(html);
+                detail.document.close();
+            };
+
+            window.robustScanUrl = function() {
+                var input = document.getElementById("urlInput").value.trim();
+                var loader = document.getElementById("loader");
+                var resultBox = document.getElementById("resultBox");
+
+                if (!input) {
+                    alert("분석할 URL을 입력해주세요.");
+                    return;
+                }
+
+                resultBox.style.display = "none";
+                loader.style.display = "block";
+
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", "/api/predict", true);
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.timeout = 20000;
+
+                xhr.onload = function() {
+                    loader.style.display = "none";
+                    try {
+                        var data = JSON.parse(xhr.responseText || "{}");
+                        if (xhr.status < 200 || xhr.status >= 300) {
+                            throw new Error(data.detail || data.error || "Prediction failed");
+                        }
+
+                        window.latestPredictionData = data;
+                        var prediction = data.prediction || "unknown";
+                        var confidence = Math.round((data.confidence || 0) * 1000) / 10;
+                        var isBad = prediction !== "benign";
+                        var color = isBad ? "#dc2626" : "#059669";
+                        var bg = isBad ? "#fef2f2" : "#ecfdf5";
+                        var border = isBad ? "#fecaca" : "#a7f3d0";
+                        var title = "Safe URL";
+                        if (prediction === "phishing") {
+                            title = "Phishing URL detected";
+                        } else if (prediction === "malware") {
+                            title = "Malware URL detected";
+                        } else if (prediction === "defacement") {
+                            title = "Defacement URL detected";
+                        } else if (isBad) {
+                            title = "Malicious URL detected";
+                        }
+
+                        resultBox.innerHTML =
+                            "<h4 style='color:" + color + "; font-size:1.15rem; margin-bottom:8px;'>" + title + "</h4>" +
+                            "<p style='color:#475569; font-size:0.95rem; margin-bottom:15px;'>Lexicon-context evidence analysis result.</p>" +
+                            "<div style='background:" + bg + "; padding:12px 16px; border-radius:12px; font-size:0.9rem; color:" + color + "; border:1px solid " + border + ";'>Classified as: <strong>" + prediction + "</strong> · Confidence " + confidence + "%</div>" +
+                            "<button type='button' class='xai-detail-button' onclick='robustOpenXaiDetail()'>XAI 상세보기</button>";
+                        resultBox.style.borderColor = border;
+                        resultBox.style.display = "block";
+                    } catch (error) {
+                        resultBox.innerHTML = "<h4 style='color:#dc2626'>Analysis failed</h4><p>" + error.message + "</p>";
+                        resultBox.style.display = "block";
+                    }
+                };
+
+                xhr.onerror = xhr.ontimeout = function() {
+                    loader.style.display = "none";
+                    resultBox.innerHTML = "<h4 style='color:#dc2626'>Analysis failed</h4><p>API request failed or timed out.</p>";
+                    resultBox.style.display = "block";
+                };
+
+                xhr.send(JSON.stringify({ url: input }));
+            };
+
+            window.openXaiDetail = window.robustOpenXaiDetail;
+            window.scanUrl = window.robustScanUrl;
+        </script>
 
         <section class="features">
             <h2 
@@ -996,9 +1151,297 @@
 
         urlInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
-                scanUrl();
+                robustScanUrl();
             }
         });
+
+        let latestPredictionData = null;
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function pct(value) {
+            const number = Number(value || 0);
+            return `${(number * 100).toFixed(1)}%`;
+        }
+
+        function openXaiDetail() {
+            if (!latestPredictionData || !latestPredictionData.xai) {
+                alert('XAI detail is not available for this result.');
+                return;
+            }
+
+            const data = latestPredictionData;
+            const xai = data.xai;
+            const evidenceRows = (xai.top_evidence || []).map((item, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${escapeHtml(item.display)}</strong><span>${escapeHtml(item.feature)}</span></td>
+                    <td>${escapeHtml(item.category)}</td>
+                    <td>${pct(item.transformer_score)}</td>
+                    <td>${pct(item.dictionary_score)}</td>
+                    <td>${pct(item.case_score)}</td>
+                    <td>x${Number(item.rule_factor || 1).toFixed(2)}</td>
+                    <td><strong>${pct(item.explanation_score)}</strong></td>
+                </tr>
+            `).join('');
+            const caseRows = (xai.similar_cases || []).map((item) => `
+                <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${pct(item.similarity)}</td>
+                    <td>${escapeHtml(item.url)}</td>
+                </tr>
+            `).join('');
+            const pageEvidence = data.page_evidence || null;
+            const pageEvidenceRows = pageEvidence ? Object.entries({
+                fetched: pageEvidence.fetched,
+                final_url: pageEvidence.final_url || pageEvidence.url,
+                status_code: pageEvidence.status_code,
+                redirected: pageEvidence.redirected,
+                title: pageEvidence.title,
+                form_count: pageEvidence.form_count,
+                password_input_count: pageEvidence.password_input_count,
+                external_form_action_count: pageEvidence.external_form_action_count,
+                insecure_form_action_count: pageEvidence.insecure_form_action_count,
+                iframe_count: pageEvidence.iframe_count,
+                external_script_count: pageEvidence.external_script_count,
+                inline_script_count: pageEvidence.inline_script_count,
+                js_eval_count: pageEvidence.js_eval_count,
+                js_document_write_count: pageEvidence.js_document_write_count,
+                js_atob_count: pageEvidence.js_atob_count,
+                js_long_string_count: pageEvidence.js_long_string_count,
+                js_obfuscation_score: pageEvidence.js_obfuscation_score,
+                ssl_checked: pageEvidence.ssl_checked,
+                ssl_issuer: pageEvidence.ssl_issuer,
+                ssl_days_until_expiry: pageEvidence.ssl_days_until_expiry,
+                ssl_host_matches_cert: pageEvidence.ssl_host_matches_cert,
+                ssl_error: pageEvidence.ssl_error,
+                suspicious_text_keywords: (pageEvidence.suspicious_text_keywords || []).join(', '),
+                error: pageEvidence.error
+            }).map(([label, value]) => `
+                <tr>
+                    <td>${escapeHtml(label)}</td>
+                    <td>${escapeHtml(value)}</td>
+                </tr>
+            `).join('') : '';
+            const evidenceDecision = data.evidence_decision || null;
+            const evidenceDecisionRows = evidenceDecision ? [
+                ['method', evidenceDecision.method],
+                ['risk_score', pct(evidenceDecision.risk_score)],
+                ['url_score', pct(evidenceDecision.url_score)],
+                ['transformer_alignment_score', pct(evidenceDecision.transformer_alignment_score)],
+                ['page_score', pct(evidenceDecision.page_score)],
+                ['formula', evidenceDecision.formula],
+                ['url_reasons', (evidenceDecision.url_reasons || []).join(' ')],
+                ['page_reasons', (evidenceDecision.page_reasons || []).join(' ')]
+            ].map(([label, value]) => `
+                <tr>
+                    <td>${escapeHtml(label)}</td>
+                    <td>${escapeHtml(value)}</td>
+                </tr>
+            `).join('') : '';
+            const componentRows = Object.entries(data.evidence_decision || {}).filter(([label]) => (
+                ['risk_score', 'url_score', 'transformer_alignment_score', 'page_score', 'formula'].includes(label)
+            )).map(([label, value]) => `
+                <tr>
+                    <td>${escapeHtml(label)}</td>
+                    <td>${escapeHtml(value)}</td>
+                </tr>
+            `).join('');
+
+            const detailWindow = window.open('', 'linkwatcher-xai-detail', 'width=1040,height=820,scrollbars=yes,resizable=yes');
+            if (!detailWindow) {
+                alert('Popup was blocked. Please allow popups for this site.');
+                return;
+            }
+
+            detailWindow.document.open();
+            detailWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>LinkWatcher XAI Detail</title>
+                    <style>
+                        * { box-sizing: border-box; }
+                        body {
+                            margin: 0;
+                            padding: 32px;
+                            color: #0f172a;
+                            background: #f8fafc;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                        }
+                        .shell { max-width: 1100px; margin: 0 auto; }
+                        h1 { margin: 0 0 8px; font-size: 1.8rem; }
+                        .url { color: #475569; word-break: break-all; margin-bottom: 20px; }
+                        .summary {
+                            padding: 18px 20px;
+                            border: 1px solid #bae6fd;
+                            border-radius: 8px;
+                            background: #eff6ff;
+                            line-height: 1.6;
+                            margin-bottom: 18px;
+                        }
+                        .policy-note {
+                            padding: 14px 16px;
+                            border: 1px solid #bbf7d0;
+                            border-radius: 8px;
+                            background: #f0fdf4;
+                            color: #166534;
+                            line-height: 1.55;
+                            margin-bottom: 18px;
+                        }
+                        .grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                            gap: 12px;
+                            margin-bottom: 18px;
+                        }
+                        .metric {
+                            padding: 16px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            background: #ffffff;
+                        }
+                        .metric span { display: block; color: #64748b; font-size: 0.82rem; margin-bottom: 8px; }
+                        .metric strong { font-size: 1.25rem; }
+                        .panel {
+                            padding: 20px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            background: #ffffff;
+                            margin-top: 14px;
+                        }
+                        .panel h2 { margin: 0 0 14px; font-size: 1.1rem; }
+                        code {
+                            display: inline-block;
+                            padding: 8px 10px;
+                            border-radius: 6px;
+                            background: #f1f5f9;
+                            color: #0f172a;
+                            font-size: 0.92rem;
+                        }
+                        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+                        th, td {
+                            padding: 11px 10px;
+                            border-bottom: 1px solid #e2e8f0;
+                            text-align: left;
+                            vertical-align: top;
+                        }
+                        th { color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+                        td span { display: block; color: #64748b; font-size: 0.76rem; margin-top: 3px; }
+                        .prob-row {
+                            display: grid;
+                            grid-template-columns: 90px 1fr 58px;
+                            align-items: center;
+                            gap: 10px;
+                            margin: 10px 0;
+                        }
+                        .prob-row div {
+                            height: 9px;
+                            overflow: hidden;
+                            border-radius: 999px;
+                            background: #e2e8f0;
+                        }
+                        .prob-row i {
+                            display: block;
+                            height: 100%;
+                            border-radius: inherit;
+                            background: #0284c7;
+                        }
+                        @media (max-width: 720px) {
+                            body { padding: 18px; }
+                            table { display: block; overflow-x: auto; white-space: nowrap; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <main class="shell">
+                        <h1>Lexicon-Context Guided XAI</h1>
+                        <p class="url">${escapeHtml(data.url)}</p>
+
+                        <div class="summary">${escapeHtml(xai.summary)}</div>
+                        <section class="grid">
+                            <div class="metric"><span>Final decision</span><strong>${escapeHtml(xai.final_prediction || data.prediction)}</strong></div>
+                            <div class="metric"><span>XAI explains</span><strong>${escapeHtml(xai.explanation_target_prediction || data.prediction)}</strong></div>
+                            <div class="metric"><span>Model method</span><strong>${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</strong></div>
+                            <div class="metric"><span>Model confidence</span><strong>${pct(data.confidence)}</strong></div>
+                            <div class="metric"><span>XAI confidence</span><strong>${pct(xai.xai_confidence)}</strong></div>
+                            <div class="metric"><span>Top evidence mean</span><strong>${pct(xai.mean_top_evidence_score)}</strong></div>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Proposed formula</h2>
+                            <code>${escapeHtml(xai.formula)}</code>
+                            <code>${escapeHtml(xai.confidence_formula)}</code>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Integrated evidence score</h2>
+                            <table>
+                                <tbody>${evidenceDecisionRows || '<tr><td colspan="2">Evidence decision was not available.</td></tr>'}</tbody>
+                            </table>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Model components</h2>
+                            <table>
+                                <tbody>${componentRows || '<tr><td colspan="2">No component score data.</td></tr>'}</tbody>
+                            </table>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Token evidence</h2>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Token</th>
+                                        <th>Type</th>
+                                        <th>Token saliency</th>
+                                        <th>Dictionary</th>
+                                        <th>Case</th>
+                                        <th>Rule</th>
+                                        <th>E_i</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${evidenceRows || '<tr><td colspan="8">No dominant evidence token.</td></tr>'}</tbody>
+                            </table>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Live page evidence</h2>
+                            <table>
+                                <tbody>${pageEvidenceRows || '<tr><td colspan="2">Page evidence was not collected.</td></tr>'}</tbody>
+                            </table>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Similar URL cases</h2>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Label</th>
+                                        <th>Similarity</th>
+                                        <th>URL</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${caseRows || '<tr><td colspan="3">No similar case was found.</td></tr>'}</tbody>
+                            </table>
+                        </section>
+                    </main>
+                </body>
+                </html>
+            `);
+            detailWindow.document.close();
+        }
 
         async function scanUrl() {
             const input = document.getElementById('urlInput').value.trim();
@@ -1026,25 +1469,23 @@
                 }
 
                 loader.style.display = 'none';
+                latestPredictionData = data;
 
                 const prediction = data.prediction;
                 const confidence = Math.round((data.confidence || 0) * 1000) / 10;
-                const transformerLine = data.transformer_used
-                    ? `<p style="color: #64748b; font-size: 0.86rem; margin-top: 8px;">Transformer phishing specialist applied · phishing probability ${(data.transformer_phishing_probability * 100).toFixed(1)}%</p>`
-                    : `<p style="color: #64748b; font-size: 0.86rem; margin-top: 8px;">Base detector prediction</p>`;
-                const knownSafeLine = data.known_safe_guard_applied
-                    ? `<p style="color: #047857; font-size: 0.86rem; margin-top: 6px;">Known-safe domain guard applied: ${data.known_safe_domain}</p>`
-                    : '';
+                const modelLine = `<p style="color: #64748b; font-size: 0.86rem; margin-top: 8px;">${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</p>`;
+                const detailButton = `<button type="button" class="xai-detail-button" onclick="openXaiDetail()">XAI 상세보기</button>`;
 
-                const resultMeta = `Classified as: <strong style="font-size:1rem;">${prediction}</strong> · Confidence ${confidence}% ${transformerLine}${knownSafeLine}`;
+                const resultMeta = `Classified as: <strong style="font-size:1rem;">${prediction}</strong> · Confidence ${confidence}% ${modelLine}`;
 
                 if (prediction === 'phishing') {
                     resultBox.innerHTML = `
-                        <h4 style="color: #dc2626; font-size: 1.15rem; margin-bottom: 8px;">Malicious URL detected (Phishing)</h4>
+                        <h4 style="color: #dc2626; font-size: 1.15rem; margin-bottom: 8px;">Phishing URL detected</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
                             This URL was classified as a <strong>phishing URL</strong> with account or credential theft risk.
                         </p>
                         <div style="background: #fef2f2; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #7f1d1d; border: 1px solid #fecaca;">${resultMeta}</div>
+                        ${detailButton}
                     `;
                     resultBox.style.borderColor = "#fca5a5";
                     resultBox.style.boxShadow = "0 10px 30px rgba(220, 38, 38, 0.1)";
@@ -1055,16 +1496,18 @@
                             This URL was classified as a <strong>malware URL</strong> with suspicious download or execution patterns.
                         </p>
                         <div style="background: #fffbeb; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #92400e; border: 1px solid #fde68a;">${resultMeta}</div>
+                        ${detailButton}
                     `;
                     resultBox.style.borderColor = "#fcd34d";
                     resultBox.style.boxShadow = "0 10px 30px rgba(217, 119, 6, 0.1)";
                 } else if (prediction === 'defacement') {
                     resultBox.innerHTML = `
-                        <h4 style="color: #0284c7; font-size: 1.15rem; margin-bottom: 8px;">Defacement URL suspected</h4>
+                        <h4 style="color: #0284c7; font-size: 1.15rem; margin-bottom: 8px;">Defacement URL detected</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
                             This URL was classified as a <strong>defacement URL</strong> with abnormal website or path patterns.
                         </p>
                         <div style="background: #f0f9ff; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #075985; border: 1px solid #bae6fd;">${resultMeta}</div>
+                        ${detailButton}
                     `;
                     resultBox.style.borderColor = "#7dd3fc";
                     resultBox.style.boxShadow = "0 10px 30px rgba(2, 132, 199, 0.1)";
@@ -1075,6 +1518,7 @@
                             This URL was classified as <strong>benign</strong>.
                         </p>
                         <div style="background: #ecfdf5; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #065f46; border: 1px solid #a7f3d0;">${resultMeta}</div>
+                        ${detailButton}
                     `;
                     resultBox.style.borderColor = "#6ee7b7";
                     resultBox.style.boxShadow = "0 10px 30px rgba(5, 150, 105, 0.1)";
@@ -1161,12 +1605,8 @@
             }, 1200);
         }
 
-        /*
-            PPT 올라오기 스타일 스크롤 애니메이션
-            - 요소가 화면에 들어오면 아래에서 위로 크게 올라옴
-            - 요소가 화면 밖으로 완전히 나가면 다시 초기화됨
-            - 다시 들어오면 애니메이션 재실행
-        */
+       
+        
         const motionElements = document.querySelectorAll('[data-motion="rise"]');
 
         const playRiseAnimation = (element) => {
@@ -1280,6 +1720,10 @@
                 card.style.setProperty('--mouse-y', '50%');
             });
         });
+    </script>
+    <script>
+        window.openXaiDetail = window.robustOpenXaiDetail || window.openXaiDetail;
+        window.scanUrl = window.robustScanUrl || window.scanUrl;
     </script>
 </body>
 </html>
