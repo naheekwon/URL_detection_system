@@ -33,11 +33,6 @@ SUSPICIOUS_TEXT_KEYWORDS = {
 }
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-EVIDENCE_LEXICON_PATH = os.path.join(
-    PROJECT_DIR,
-    "artifacts_transformer",
-    "evidence_lexicon.json",
-)
 LEARNED_RISK_DICT_PATH = os.path.join(
     PROJECT_DIR,
     "artifacts_transformer",
@@ -99,16 +94,10 @@ def _load_text_lexicon():
             "malware": _terms_from_learned_dict(class_dict.get("malware", {})),
         }
 
-    try:
-        with open(EVIDENCE_LEXICON_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        data = {}
-
     return {
-        "phishing": set(data.get("phishing_intent_terms", [])) | SUSPICIOUS_TEXT_KEYWORDS,
-        "defacement": set(data.get("defacement_terms", [])) | {"hacked by", "defaced by", "owned by"},
-        "malware": set(data.get("malware_terms", [])),
+        "phishing": SUSPICIOUS_TEXT_KEYWORDS,
+        "defacement": set(),
+        "malware": set(),
     }
 
 
