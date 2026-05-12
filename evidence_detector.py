@@ -1,35 +1,23 @@
-import json
 import os
 import re
 import urllib.parse
 
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-EVIDENCE_LEXICON_PATH = os.path.join(
-    PROJECT_DIR,
-    "artifacts_transformer",
-    "evidence_lexicon.json",
-)
 
 
-def _load_evidence_lexicon(path=EVIDENCE_LEXICON_PATH):
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
+def _empty_lexicon():
     return {
-        "risk_terms": set(data.get("risk_terms", [])),
-        "phishing_intent_terms": set(data.get("phishing_intent_terms", [])),
-        "defacement_terms": set(data.get("defacement_terms", [])),
-        "malware_terms": set(data.get("malware_terms", [])),
-        "risk_extensions": set(data.get("risk_extensions", [])),
-        "compressed_extensions": set(data.get("compressed_extensions", [])),
-        "risk_tlds": set(data.get("risk_tlds", [])),
-        "impersonation_targets": set(data.get("impersonation_targets", [])),
-        "lookalike_digit_map": str.maketrans(data.get("lookalike_digit_map", {})),
+        "risk_terms": set(),
+        "phishing_intent_terms": set(),
+        "defacement_terms": set(),
+        "malware_terms": set(),
+        "risk_extensions": set(),
+        "compressed_extensions": {"zip", "rar"},
+        "risk_tlds": set(),
+        "impersonation_targets": set(),
+        "lookalike_digit_map": str.maketrans({}),
     }
-
-
-EVIDENCE_LEXICON = _load_evidence_lexicon()
 
 
 def _feature_value(feature):
@@ -51,7 +39,7 @@ def _valid_learned_term(value):
 
 def _lexicon_from_learned_risk_dict(learned_risk_dict):
     if not learned_risk_dict:
-        return EVIDENCE_LEXICON
+        return _empty_lexicon()
 
     common_dict = learned_risk_dict.get("common_malicious", {})
     class_dict = learned_risk_dict.get("class_specific", {})
@@ -66,17 +54,7 @@ def _lexicon_from_learned_risk_dict(learned_risk_dict):
         "compressed_extensions": {"zip", "rar"},
         "risk_tlds": set(),
         "impersonation_targets": set(metadata.get("impersonation_targets", [])),
-        "lookalike_digit_map": str.maketrans(
-            metadata.get("lookalike_digit_map", {})
-            or {
-                "0": "o",
-                "1": "l",
-                "3": "e",
-                "4": "a",
-                "5": "s",
-                "7": "t",
-            }
-        ),
+        "lookalike_digit_map": str.maketrans(metadata.get("lookalike_digit_map", {})),
     }
 
     for label, terms in metadata.get("domain_seed_terms", {}).items():
