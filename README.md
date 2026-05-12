@@ -12,6 +12,10 @@
 
 현재 구현된 최종 모듈은 다음과 같은 구조를 가집니다.
 
+## 시스템 아키텍처
+
+<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
+
 ```text
 Learned Lexicon-Context XAI Model
 = 학습 기반 위험토큰 사전
