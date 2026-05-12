@@ -13,18 +13,9 @@
 ## 제안 모델
 
 현재 구현된 최종 모듈은 다음과 같은 구조를 가집니다.
-<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
-
 <br/>
-```text
-Learned Lexicon-Context XAI Model
-= 학습 기반 위험토큰 사전
-+ Transformer-token alignment
-+ 정적 페이지 evidence
-+ XAI 상세 설명
-```
-
-
+<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
+<br/>
 
 ## 최종 위험도 수식
 
