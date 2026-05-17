@@ -15,9 +15,7 @@
 ## 제안 모델
 
 현재 구현된 최종 모듈은 다음과 같은 구조를 가집니다.
-<br/>
-<img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
-<br/>
+
 
 ## 최종 위험도 수식
 
