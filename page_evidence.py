@@ -32,6 +32,57 @@ SUSPICIOUS_TEXT_KEYWORDS = {
     "wallet",
 }
 
+LOW_INFORMATION_PAGE_TERMS = {
+    "align",
+    "blank",
+    "block",
+    "body",
+    "border",
+    "button",
+    "center",
+    "class",
+    "color",
+    "content",
+    "display",
+    "div",
+    "font",
+    "font-size",
+    "form",
+    "head",
+    "height",
+    "hidden",
+    "hit",
+    "href",
+    "html",
+    "image",
+    "img",
+    "inline",
+    "input",
+    "label",
+    "left",
+    "line",
+    "link",
+    "main",
+    "margin",
+    "meta",
+    "none",
+    "padding",
+    "page",
+    "right",
+    "script",
+    "scr",
+    "span",
+    "src",
+    "style",
+    "table",
+    "tcolor",
+    "text",
+    "title",
+    "type",
+    "value",
+    "width",
+}
+
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 EVIDENCE_LEXICON_PATH = os.path.join(
     PROJECT_DIR,
@@ -58,8 +109,23 @@ def _valid_text_term(value):
         return False
     if value.isdigit():
         return False
+    if value in LOW_INFORMATION_PAGE_TERMS:
+        return False
+    if re.fullmatch(r"[a-z]{1,4}", value) and value not in SUSPICIOUS_TEXT_KEYWORDS:
+        return False
 
     return bool(re.search(r"[a-z]", value))
+
+
+def _keyword_in_text(keyword, text):
+    keyword = str(keyword or "").strip().lower()
+    if not keyword:
+        return False
+    if keyword in LOW_INFORMATION_PAGE_TERMS:
+        return False
+    if " " in keyword:
+        return keyword in text
+    return re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", text) is not None
 
 
 def _terms_from_learned_dict(features, threshold=4.0):
@@ -240,15 +306,15 @@ class PageSignalParser(HTMLParser):
         text_surface = visible_text + " " + title.lower()
         suspicious_keywords = sorted(
             keyword for keyword in TEXT_LEXICON["phishing"]
-            if keyword in text_surface
+            if _keyword_in_text(keyword, text_surface)
         )
         defacement_keywords = sorted(
             keyword for keyword in TEXT_LEXICON["defacement"]
-            if keyword in text_surface
+            if _keyword_in_text(keyword, text_surface)
         )
         malware_keywords = sorted(
             keyword for keyword in TEXT_LEXICON["malware"]
-            if keyword in text_surface
+            if _keyword_in_text(keyword, text_surface)
         )
         js_eval_count = len(re.findall(r"\beval\s*\(", inline_script))
         js_document_write_count = len(re.findall(r"document\.write\s*\(", inline_script))

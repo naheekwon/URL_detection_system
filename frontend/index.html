@@ -1172,12 +1172,13 @@
         }
 
         function openXaiDetail() {
-            if (!latestPredictionData || !latestPredictionData.xai) {
+            const currentPredictionData = latestPredictionData || window.latestPredictionData;
+            if (!currentPredictionData || !currentPredictionData.xai) {
                 alert('XAI detail is not available for this result.');
                 return;
             }
 
-            const data = latestPredictionData;
+            const data = currentPredictionData;
             const xai = data.xai;
             const evidenceRows = (xai.top_evidence || []).map((item, index) => `
                 <tr>
@@ -1231,6 +1232,33 @@
                 </tr>
             `).join('') : '';
             const evidenceDecision = data.evidence_decision || null;
+            const barWidth = (value) => Math.max(0, Math.min(100, Number(value || 0) * 100)).toFixed(1);
+            const componentBars = evidenceDecision ? [
+                ['Final risk', evidenceDecision.risk_score, '#0f172a'],
+                ['URL lexicon', evidenceDecision.url_score, '#2563eb'],
+                ['Transformer alignment', evidenceDecision.transformer_alignment_score, '#7c3aed'],
+                ['Static page evidence', evidenceDecision.page_score, '#16a34a']
+            ].map(([label, value, color]) => `
+                <div class="score-bar-row">
+                    <span>${escapeHtml(label)}</span>
+                    <div><i style="width:${barWidth(value)}%; background:${color};"></i></div>
+                    <strong>${pct(value)}</strong>
+                </div>
+            `).join('') : '';
+            const tokenBars = (xai.top_evidence || []).slice(0, 6).map((item) => `
+                <div class="token-bar-row">
+                    <span><strong>${escapeHtml(item.display)}</strong><em>${escapeHtml(item.category)}</em></span>
+                    <div><i style="width:${barWidth(item.explanation_score)}%;"></i></div>
+                    <strong>${pct(item.explanation_score)}</strong>
+                </div>
+            `).join('');
+            const decisionEvidenceBars = (xai.decision_evidence || []).slice(0, 6).map((item) => `
+                <div class="decision-bar-row">
+                    <span><strong>${escapeHtml(item.source)}</strong><em>${escapeHtml(item.reason)}</em></span>
+                    <div><i style="width:${barWidth(item.score)}%;"></i></div>
+                    <strong>${pct(item.score)}</strong>
+                </div>
+            `).join('');
             const evidenceDecisionRows = evidenceDecision ? [
                 ['method', evidenceDecision.method],
                 ['risk_score', pct(evidenceDecision.risk_score)],
@@ -1356,9 +1384,81 @@
                             border-radius: inherit;
                             background: #0284c7;
                         }
+                        .viz-grid {
+                            display: grid;
+                            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                            gap: 14px;
+                            margin-top: 14px;
+                        }
+                        .viz-box {
+                            padding: 16px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            background: #ffffff;
+                        }
+                        .viz-box h2 {
+                            margin: 0 0 12px;
+                            font-size: 1rem;
+                        }
+                        .score-bar-row,
+                        .decision-bar-row,
+                        .token-bar-row {
+                            display: grid;
+                            grid-template-columns: 150px 1fr 58px;
+                            align-items: center;
+                            gap: 10px;
+                            margin: 10px 0;
+                            font-size: 0.9rem;
+                        }
+                        .token-bar-row {
+                            grid-template-columns: 130px 1fr 58px;
+                        }
+                        .decision-bar-row {
+                            grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 1fr) 58px;
+                        }
+                        .score-bar-row > div,
+                        .decision-bar-row > div,
+                        .token-bar-row > div {
+                            height: 11px;
+                            overflow: hidden;
+                            border-radius: 999px;
+                            background: #e2e8f0;
+                        }
+                        .score-bar-row i,
+                        .decision-bar-row i,
+                        .token-bar-row i {
+                            display: block;
+                            height: 100%;
+                            border-radius: inherit;
+                            background: #dc2626;
+                        }
+                        .score-bar-row strong,
+                        .decision-bar-row strong,
+                        .token-bar-row strong {
+                            text-align: right;
+                            font-size: 0.85rem;
+                        }
+                        .decision-bar-row em,
+                        .token-bar-row em {
+                            display: block;
+                            margin-top: 2px;
+                            color: #64748b;
+                            font-size: 0.72rem;
+                            font-style: normal;
+                        }
+                        .viz-note {
+                            margin-top: 10px;
+                            color: #64748b;
+                            font-size: 0.82rem;
+                            line-height: 1.45;
+                        }
                         @media (max-width: 720px) {
                             body { padding: 18px; }
                             table { display: block; overflow-x: auto; white-space: nowrap; }
+                            .viz-grid { grid-template-columns: 1fr; }
+                            .score-bar-row,
+                            .decision-bar-row,
+                            .token-bar-row { grid-template-columns: 120px 1fr 52px; }
                         }
                     </style>
                 </head>
@@ -1383,6 +1483,25 @@
                             <code>${escapeHtml(xai.confidence_formula)}</code>
                         </section>
 
+                        <section class="viz-grid">
+                            <div class="viz-box">
+                                <h2>Evidence contribution graph</h2>
+                                ${componentBars || '<p class="viz-note">No component score data.</p>'}
+                                <p class="viz-note">Final risk is calculated from URL lexicon evidence, Transformer-token alignment, and static page evidence.</p>
+                            </div>
+                            <div class="viz-box">
+                                <h2>Top token evidence graph</h2>
+                                ${tokenBars || '<p class="viz-note">No dominant token evidence.</p>'}
+                                <p class="viz-note">Each bar shows E_i, the combined token-level explanation score.</p>
+                            </div>
+                        </section>
+
+                        <section class="panel">
+                            <h2>Decision evidence graph</h2>
+                            ${decisionEvidenceBars || '<p class="viz-note">No decision-level evidence was available.</p>'}
+                            <p class="viz-note">This graph explains the final decision-level evidence. Token evidence below is only a supporting saliency view.</p>
+                        </section>
+
                         <section class="panel">
                             <h2>Integrated evidence score</h2>
                             <table>
@@ -1391,7 +1510,7 @@
                         </section>
 
                         <section class="panel">
-                            <h2>Model components</h2>
+                            <h2>Integrated score details</h2>
                             <table>
                                 <tbody>${componentRows || '<tr><td colspan="2">No component score data.</td></tr>'}</tbody>
                             </table>
@@ -1470,6 +1589,7 @@
 
                 loader.style.display = 'none';
                 latestPredictionData = data;
+                window.latestPredictionData = data;
 
                 const prediction = data.prediction;
                 const confidence = Math.round((data.confidence || 0) * 1000) / 10;
@@ -1722,7 +1842,8 @@
         });
     </script>
     <script>
-        window.openXaiDetail = window.robustOpenXaiDetail || window.openXaiDetail;
+        window.robustOpenXaiDetail = window.openXaiDetail || window.robustOpenXaiDetail;
+        window.openXaiDetail = window.openXaiDetail || window.robustOpenXaiDetail;
         window.scanUrl = window.robustScanUrl || window.scanUrl;
     </script>
 </body>

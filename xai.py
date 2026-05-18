@@ -474,13 +474,61 @@ def build_xai_explanation(
     top_evidence = deduplicated_evidence[:10]
     top_scores = [item["explanation_score"] for item in top_evidence[:5]]
     mean_top_score = float(np.mean(top_scores)) if top_scores else 0.0
-    xai_confidence = _clip01(confidence * mean_top_score)
 
     top_terms = ", ".join(item["display"] for item in top_evidence[:3]) or "no dominant token"
+    decision_evidence = prediction_result.get("evidence_decision") or {}
+    url_reasons = decision_evidence.get("url_reasons") or []
+    page_reasons = decision_evidence.get("page_reasons") or []
+    primary_reasons = url_reasons[:2] or page_reasons[:2]
+    decision_risk_score = _clip01(decision_evidence.get("risk_score", 0.0))
+    decision_url_score = _clip01(decision_evidence.get("url_score", 0.0))
+    decision_page_score = _clip01(decision_evidence.get("page_score", 0.0))
+    decision_transformer_score = _clip01(decision_evidence.get("transformer_alignment_score", 0.0))
+    decision_items = []
+
+    for reason in url_reasons[:4]:
+        decision_items.append({
+            "source": "URL context",
+            "reason": reason,
+            "score": round(decision_url_score, 4),
+        })
+
+    for reason in page_reasons[:3]:
+        decision_items.append({
+            "source": "Static page evidence",
+            "reason": reason,
+            "score": round(decision_page_score, 4),
+        })
+
+    if decision_transformer_score > 0:
+        decision_items.append({
+            "source": "Transformer alignment",
+            "reason": "Transformer-token alignment supported the URL-level evidence.",
+            "score": round(decision_transformer_score, 4),
+        })
+
     if explanation_target == "benign":
+        xai_confidence = _clip01(max(confidence * mean_top_score, 1.0 - decision_risk_score))
+    else:
+        xai_confidence = _clip01(max(confidence * mean_top_score, decision_risk_score))
+
+    if explanation_target == "benign":
+        if primary_reasons:
+            reason_text = " ".join(primary_reasons)
+            summary = (
+                f"The model classified the URL as benign because the integrated evidence score "
+                f"remained below the risk threshold. Main evidence: {reason_text}"
+            )
+        else:
+            summary = (
+                f"The model classified the URL as benign because no strong contextual URL, "
+                f"Transformer-alignment, or static page risk evidence was found."
+            )
+    elif primary_reasons:
+        reason_text = " ".join(primary_reasons)
         summary = (
-            f"The model classified the URL as benign. The strongest explainable signals were "
-            f"{top_terms}, while the overall risk evidence remained limited."
+            f"The model classified the URL as {explanation_target}. Main decision evidence: "
+            f"{reason_text} Supporting token-level signals include {top_terms}."
         )
     else:
         summary = (
@@ -506,6 +554,8 @@ def build_xai_explanation(
         "xai_confidence": round(xai_confidence, 4),
         "mean_top_evidence_score": round(mean_top_score, 4),
         "top_evidence": top_evidence,
+        "primary_decision_reasons": primary_reasons,
+        "decision_evidence": decision_items,
         "similar_cases": similar_cases,
         "summary": summary,
     }
