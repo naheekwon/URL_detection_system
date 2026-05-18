@@ -773,12 +773,10 @@ def hybrid_predict(urls, inspect_pages=False, include_debug=False):
         if transformer_phishing_probability is None:
             transformer_phishing_probability = meta_transformer_probability
 
-        raw_model_debug = {
+        integrated_debug = {
             "prediction": final_label,
             "is_malicious": final_label != config["benign_label"],
             "confidence": confidence,
-            "base_prediction": base_label,
-            "class_probabilities": class_probabilities,
             "transformer_used": transformer_phishing_probability is not None,
             "transformer_phishing_probability": transformer_phishing_probability,
             "meta_gate_used": idx in meta_scores_by_index,
@@ -832,7 +830,7 @@ def hybrid_predict(urls, inspect_pages=False, include_debug=False):
         )
 
         if include_debug:
-            result["debug_raw_url_model"] = raw_model_debug
+            result["debug_integrated_pipeline"] = integrated_debug
 
         results.append(result)
 
@@ -851,6 +849,7 @@ def hybrid_predict(urls, inspect_pages=False, include_debug=False):
 
 @app.route("/")
 def index():
+    """Serve the web frontend from the same Flask backend used for inference."""
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
@@ -865,6 +864,37 @@ def health():
         "meta_gate_artifact_dir": META_GATE_ARTIFACT_DIR,
         "meta_gate_model_family": meta_gate_config.get("model_family"),
         "meta_gate_threshold": meta_gate_threshold,
+    })
+
+
+@app.route("/api/backend-info")
+def backend_info():
+    return jsonify({
+        "backend_role": "Flask web backend and model inference API",
+        "frontend_serving": {
+            "route": "GET /",
+            "directory": FRONTEND_DIR,
+            "entrypoint": "index.html",
+        },
+        "api_endpoints": {
+            "health": "GET /health",
+            "predict": "POST /api/predict",
+            "backend_info": "GET /api/backend-info",
+        },
+        "prediction_pipeline": [
+            "URL request from frontend",
+            "model artifacts loaded in app.py",
+            "feature extraction and Transformer alignment",
+            "Lexicon-Context evidence decision",
+            "XAI JSON response",
+            "frontend result card and XAI detail rendering",
+        ],
+        "classes": class_names,
+        "xai_modules": [
+            "evidence_detector.py",
+            "page_evidence.py",
+            "xai.py",
+        ],
     })
 
 

@@ -222,6 +222,35 @@ def _learned_risk_features(parsed, host, host_parts, path, query):
     return features
 
 
+def _feature_context_weight(feature, host_parts):
+    prefix = feature.split(":", 1)[0] if ":" in feature else feature
+    value = _feature_value(feature)
+    sld = _second_level_domain(host_parts)
+    tld = host_parts[-1] if host_parts else ""
+
+    if prefix in {"path", "pseg", "qkey", "qk", "qv"}:
+        return 1.0, "contextual path/query token"
+
+    if prefix == "subdomain":
+        return 0.85, "subdomain token"
+
+    if prefix in {"ext", "scheme", "host_is_ip"}:
+        return 1.0, "structural URL token"
+
+    if prefix == "tld":
+        return 0.65, "TLD token"
+
+    if prefix in {"sld", "domain", "dpart"}:
+        if value == sld or value == tld:
+            return 0.18, "registered-domain token with low standalone evidence"
+        return 0.35, "host token"
+
+    if prefix == "tok":
+        return 0.30, "context-free token"
+
+    return 0.50, "generic token"
+
+
 def _learned_dictionary_evidence(parsed, host, host_parts, path, query, learned_risk_dict):
     if not learned_risk_dict:
         return 0.0, {}, []
@@ -239,16 +268,18 @@ def _learned_dictionary_evidence(parsed, host, host_parts, path, query, learned_
     }
 
     for feature in features:
+        context_weight, context_name = _feature_context_weight(feature, host_parts)
         if feature in common_dict:
-            value = float(common_dict[feature])
+            value = float(common_dict[feature]) * context_weight
             common_score = max(common_score, value)
-            matched.append((value, "common", feature))
+            matched.append((value, "common", feature, context_name))
 
         for label in type_scores:
-            value = float(class_dict.get(label, {}).get(feature, 0.0))
-            if value > 0:
+            raw_value = float(class_dict.get(label, {}).get(feature, 0.0))
+            if raw_value > 0:
+                value = raw_value * context_weight
                 type_scores[label] = max(type_scores[label], value)
-                matched.append((value, label, feature))
+                matched.append((value, label, feature, context_name))
 
     matched.sort(reverse=True)
     learned_score = min(0.35, max([common_score] + list(type_scores.values())) / 20.0)
@@ -260,10 +291,14 @@ def _learned_dictionary_evidence(parsed, host, host_parts, path, query, learned_
     reasons = []
     if matched:
         top = [
-            f"{label}:{feature}"
-            for _, label, feature in matched[:5]
+            f"{label}:{feature} ({context_name})"
+            for _, label, feature, context_name in matched[:5]
         ]
-        reasons.append("Learned risk dictionary matched URL tokens: " + ", ".join(top) + ".")
+        reasons.append(
+            "Learned risk dictionary matched URL tokens with context weighting: "
+            + ", ".join(top)
+            + "."
+        )
 
     return learned_score, normalized_type_scores, reasons
 
@@ -280,9 +315,14 @@ def _url_evidence(url, learned_risk_dict=None):
     host_subparts = []
     for part in host_parts:
         host_subparts.extend(_split_parts(part))
+    subdomain_parts = host_parts[:-2] if len(host_parts) >= 3 else []
+    subdomain_subparts = []
+    for part in subdomain_parts:
+        subdomain_subparts.extend(_split_parts(part))
     path_parts = _split_parts(path)
     query_parts = _split_parts(query)
     all_parts = set(host_parts + host_subparts + path_parts + query_parts)
+    contextual_parts = set(subdomain_parts + subdomain_subparts + path_parts + query_parts)
 
     reasons = []
     type_scores = {
@@ -354,18 +394,18 @@ def _url_evidence(url, learned_risk_dict=None):
                 type_scores["malware"] += 0.34
                 reasons.append(f"URL points to a risky executable file extension '.{ext}'.")
 
-    matched_terms = sorted(all_parts & lexicon["risk_terms"])
+    matched_terms = sorted(contextual_parts & lexicon["risk_terms"])
     if matched_terms:
         score += min(0.30, 0.08 * len(matched_terms))
-        reasons.append("Risk-intent terms in URL: " + ", ".join(matched_terms[:5]) + ".")
+        reasons.append("Contextual risk-intent terms in URL: " + ", ".join(matched_terms[:5]) + ".")
 
-    phishing_terms = sorted(all_parts & lexicon["phishing_intent_terms"])
+    phishing_terms = sorted(contextual_parts & lexicon["phishing_intent_terms"])
     if len(phishing_terms) >= 2:
         score += 0.18
         type_scores["phishing"] += 0.24
         reasons.append("Multiple credential-phishing intent terms: " + ", ".join(phishing_terms[:5]) + ".")
 
-    defacement_terms = sorted(all_parts & lexicon["defacement_terms"])
+    defacement_terms = sorted(contextual_parts & lexicon["defacement_terms"])
     if defacement_terms:
         defacement_score = min(0.44, 0.28 + 0.06 * (len(defacement_terms) - 1))
         score += defacement_score
@@ -376,14 +416,14 @@ def _url_evidence(url, learned_risk_dict=None):
             type_scores["defacement"] += 0.08
             reasons.append("Defacement term appears in a web page filename.")
 
-    malware_terms = sorted(all_parts & lexicon["malware_terms"])
+    malware_terms = sorted(contextual_parts & lexicon["malware_terms"])
     if malware_terms and "." in last_path_segment:
         malware_lure_score = min(0.30, 0.12 + 0.06 * len(malware_terms))
         score += malware_lure_score
         type_scores["malware"] += malware_lure_score
         reasons.append("Download/malware lure terms near a file path: " + ", ".join(malware_terms[:5]) + ".")
 
-    host_brand_terms = sorted(set(host_subparts) & lexicon["impersonation_targets"])
+    host_brand_terms = sorted(set(subdomain_subparts + path_parts + query_parts) & lexicon["impersonation_targets"])
     if host_brand_terms and phishing_terms:
         brand_phishing_score = 0.30 if len(phishing_terms) == 1 else 0.24
         score += brand_phishing_score
