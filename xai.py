@@ -49,18 +49,68 @@ HIGH_RISK_FEATURES = {
 }
 
 LOW_INFORMATION_DISPLAYS = {
+    "api",
+    "asp",
+    "aspx",
+    "by",
     "com",
     "co",
+    "example",
+    "html",
     "http",
     "https",
+    "id",
+    "index",
+    "message",
     "net",
+    "news",
     "org",
+    "page",
+    "php",
+    "test",
     "www",
 }
 
 
 def _clip01(value):
     return max(0.0, min(float(value), 1.0))
+
+
+def _is_char_ngram(feature):
+    return str(feature).startswith("char:")
+
+
+def _evidence_strength(item):
+    dictionary_score = float(item.get("dictionary_score", 0.0))
+    case_score = float(item.get("case_score", 0.0))
+    rule_factor = float(item.get("rule_factor", 1.0))
+    rule_reasons = set(item.get("rule_reasons") or [])
+
+    if dictionary_score > 0 and rule_factor > 1.0:
+        return "strong"
+    if dictionary_score > 0 or case_score > 0:
+        return "strong"
+    if (
+        rule_factor > 1.0
+        and str(item.get("display", "")).lower() not in LOW_INFORMATION_DISPLAYS
+        and rule_reasons - {"query-string context"}
+    ):
+        return "medium"
+    return "weak"
+
+
+def _is_human_meaningful(item):
+    display = str(item.get("display", "")).strip()
+    if not display:
+        return False
+    if item.get("category") == "character_ngram":
+        return False
+    if display.lower() in LOW_INFORMATION_DISPLAYS:
+        return False
+    if len(display) <= 1:
+        return False
+
+    return True
 
 
 def _feature_display(feature):
@@ -432,7 +482,13 @@ def build_xai_explanation(
         if str(display).lower() in LOW_INFORMATION_DISPLAYS and not has_external_evidence:
             continue
 
+        if str(display).lower() in LOW_INFORMATION_DISPLAYS and dictionary_score <= 0 and case_score <= 0:
+            continue
+
         if len(str(display)) <= 1 and not has_external_evidence:
+            continue
+
+        if _is_char_ngram(feature) and not has_external_evidence:
             continue
 
         explanation_score = (
@@ -445,7 +501,7 @@ def build_xai_explanation(
         if explanation_score <= 0 and dictionary_score <= 0:
             continue
 
-        evidence.append({
+        evidence_item = {
             "feature": feature,
             "display": display,
             "category": _feature_category(feature),
@@ -458,12 +514,20 @@ def build_xai_explanation(
             "rule_factor": round(rule_factor, 4),
             "rule_reasons": rule_reasons,
             "explanation_score": round(explanation_score, 4),
-        })
+        }
+        evidence_item["strength"] = _evidence_strength(evidence_item)
+        evidence_item["human_meaningful"] = _is_human_meaningful(evidence_item)
+        evidence.append(evidence_item)
 
     evidence.sort(key=lambda item: item["explanation_score"], reverse=True)
+    meaningful_evidence = [item for item in evidence if item["human_meaningful"]]
+    internal_saliency_evidence = [
+        item for item in evidence
+        if item["category"] == "character_ngram" and not item["human_meaningful"]
+    ][:10]
     deduplicated_evidence = []
     seen_display = set()
-    for item in evidence:
+    for item in meaningful_evidence:
         display_key = str(item["display"]).lower()
         if display_key in seen_display:
             continue
@@ -472,10 +536,21 @@ def build_xai_explanation(
         deduplicated_evidence.append(item)
 
     top_evidence = deduplicated_evidence[:10]
-    top_scores = [item["explanation_score"] for item in top_evidence[:5]]
+    top_scores = [
+        item["explanation_score"]
+        for item in top_evidence[:5]
+        if item["strength"] in {"strong", "medium"}
+    ]
     mean_top_score = float(np.mean(top_scores)) if top_scores else 0.0
 
-    top_terms = ", ".join(item["display"] for item in top_evidence[:3]) or "no dominant token"
+    strong_terms = [
+        item["display"]
+        for item in top_evidence
+        if item["strength"] == "strong"
+    ][:3]
+    top_terms = ", ".join(strong_terms) or ", ".join(
+        item["display"] for item in top_evidence[:3]
+    ) or "no dominant token"
     decision_evidence = prediction_result.get("evidence_decision") or {}
     url_reasons = decision_evidence.get("url_reasons") or []
     page_reasons = decision_evidence.get("page_reasons") or []
@@ -528,7 +603,7 @@ def build_xai_explanation(
         reason_text = " ".join(primary_reasons)
         summary = (
             f"The model classified the URL as {explanation_target}. Main decision evidence: "
-            f"{reason_text} Supporting token-level signals include {top_terms}."
+            f"{reason_text} Main token evidence: {top_terms}."
         )
     else:
         summary = (
@@ -554,6 +629,7 @@ def build_xai_explanation(
         "xai_confidence": round(xai_confidence, 4),
         "mean_top_evidence_score": round(mean_top_score, 4),
         "top_evidence": top_evidence,
+        "internal_saliency_evidence": internal_saliency_evidence,
         "primary_decision_reasons": primary_reasons,
         "decision_evidence": decision_items,
         "similar_cases": similar_cases,

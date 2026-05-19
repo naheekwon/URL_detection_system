@@ -1189,6 +1189,7 @@
                     <td>${pct(item.dictionary_score)}</td>
                     <td>${pct(item.case_score)}</td>
                     <td>x${Number(item.rule_factor || 1).toFixed(2)}</td>
+                    <td>${escapeHtml(item.strength || 'weak')}</td>
                     <td><strong>${pct(item.explanation_score)}</strong></td>
                 </tr>
             `).join('');
@@ -1473,7 +1474,7 @@
                             <div class="metric"><span>XAI explains</span><strong>${escapeHtml(xai.explanation_target_prediction || data.prediction)}</strong></div>
                             <div class="metric"><span>Model method</span><strong>${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</strong></div>
                             <div class="metric"><span>Model confidence</span><strong>${pct(data.confidence)}</strong></div>
-                            <div class="metric"><span>XAI confidence</span><strong>${pct(xai.xai_confidence)}</strong></div>
+                            <div class="metric"><span>Evidence strength</span><strong>${pct(xai.xai_confidence)}</strong></div>
                             <div class="metric"><span>Top evidence mean</span><strong>${pct(xai.mean_top_evidence_score)}</strong></div>
                         </section>
 
@@ -1481,6 +1482,7 @@
                             <h2>Proposed formula</h2>
                             <code>${escapeHtml(xai.formula)}</code>
                             <code>${escapeHtml(xai.confidence_formula)}</code>
+                            <p class="viz-note">The formula computes token-level E_i. The final decision is explained by the integrated evidence score below.</p>
                         </section>
 
                         <section class="viz-grid">
@@ -1528,10 +1530,11 @@
                                         <th>Dictionary</th>
                                         <th>Case</th>
                                         <th>Rule</th>
+                                        <th>Strength</th>
                                         <th>E_i</th>
                                     </tr>
                                 </thead>
-                                <tbody>${evidenceRows || '<tr><td colspan="8">No dominant evidence token.</td></tr>'}</tbody>
+                                <tbody>${evidenceRows || '<tr><td colspan="9">No dominant evidence token.</td></tr>'}</tbody>
                             </table>
                         </section>
 
