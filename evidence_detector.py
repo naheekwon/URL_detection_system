@@ -226,27 +226,36 @@ def _second_level_domain(host_parts):
     return host_parts[-2]
 
 
+def _is_ipv4_host(host):
+    return bool(re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", str(host or "")))
+
+
 def _learned_risk_features(parsed, host, host_parts, path, query):
     features = set()
     path_parts = _split_parts(path)
     query_pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
+    is_ipv4_host = _is_ipv4_host(host)
 
-    if host_parts:
+    if is_ipv4_host:
+        features.add("host_is_ip")
+        if host:
+            features.add(f"domain:{host}")
+    elif host_parts:
         features.add(f"tld:{host_parts[-1]}")
 
-    if len(host_parts) >= 2:
-        features.add(f"sld:{host_parts[-2]}")
+        if len(host_parts) >= 2:
+            features.add(f"sld:{host_parts[-2]}")
 
-    if len(host_parts) >= 3:
-        features.add("subdomain:" + ".".join(host_parts[:-2]))
+        if len(host_parts) >= 3:
+            features.add("subdomain:" + ".".join(host_parts[:-2]))
 
-    if host:
-        features.add(f"domain:{host}")
+        if host:
+            features.add(f"domain:{host}")
 
-    for part in host_parts:
-        features.add(f"dpart:{part}")
-        features.add(f"domain:{part}")
-        features.add(f"tok:{part}")
+        for part in host_parts:
+            features.add(f"dpart:{part}")
+            features.add(f"domain:{part}")
+            features.add(f"tok:{part}")
 
     for part in path_parts:
         features.add(f"path:{part}")
@@ -265,9 +274,6 @@ def _learned_risk_features(parsed, host, host_parts, path, query):
         for part in _split_parts(value):
             features.add(f"qv:{part}")
             features.add(f"tok:{part}")
-
-    if re.search(r"\d{1,3}(\.\d{1,3}){3}", host):
-        features.add("host_is_ip")
 
     if parsed.scheme == "http":
         features.add("scheme:http")
@@ -398,7 +404,9 @@ def _url_evidence(url, learned_risk_dict=None):
         type_scores["phishing"] += 0.04
         reasons.append("URL contains percent-encoded characters.")
 
-    if re.search(r"\d{1,3}(\.\d{1,3}){3}", host):
+    is_ipv4_host = _is_ipv4_host(host)
+
+    if is_ipv4_host:
         score += 0.30
         reasons.append("Host is represented as an IP address.")
 
@@ -406,7 +414,7 @@ def _url_evidence(url, learned_risk_dict=None):
         score += 0.10
         reasons.append("URL is unusually long.")
 
-    if len(host_parts) >= 4:
+    if len(host_parts) >= 4 and not is_ipv4_host:
         score += 0.08
         reasons.append("Host contains many domain parts.")
 
@@ -434,7 +442,7 @@ def _url_evidence(url, learned_risk_dict=None):
                     f"Look-alike normalized domain matches a high-value impersonation target: {normalized_sld}."
                 )
 
-    if host_parts and host_parts[-1] in lexicon["risk_tlds"]:
+    if host_parts and not is_ipv4_host and host_parts[-1] in lexicon["risk_tlds"]:
         score += 0.16
         reasons.append(f"TLD '.{host_parts[-1]}' is commonly abused in phishing campaigns.")
 
@@ -444,11 +452,11 @@ def _url_evidence(url, learned_risk_dict=None):
             if ext in lexicon["compressed_extensions"]:
                 score += 0.28
                 type_scores["malware"] += 0.22
-                reasons.append(f"URL points to a compressed download file '.{ext}'.")
+                reasons.append(f"URL contains a compressed download file indicator '.{ext}'.")
             else:
                 score += 0.40
                 type_scores["malware"] += 0.34
-                reasons.append(f"URL points to a risky executable file extension '.{ext}'.")
+                reasons.append(f"URL contains an executable file extension risk indicator '.{ext}'.")
 
     matched_terms = sorted(contextual_parts & lexicon["risk_terms"])
     if matched_terms:
@@ -478,7 +486,19 @@ def _url_evidence(url, learned_risk_dict=None):
         malware_lure_score = min(0.30, 0.12 + 0.06 * len(malware_terms))
         score += malware_lure_score
         type_scores["malware"] += malware_lure_score
-        reasons.append("Download/malware lure terms near a file path: " + ", ".join(malware_terms[:5]) + ".")
+        context_terms = [term for term in malware_terms if term != "exe"]
+        if context_terms:
+            reasons.append(
+                "Software-delivery terms appear near a file path; these terms can be benign alone, "
+                "but add malware-distribution risk when combined with executable or download-path structure: "
+                + ", ".join(malware_terms[:5])
+                + "."
+            )
+        elif "exe" in malware_terms:
+            reasons.append(
+                "The executable extension is interpreted as a file-delivery URL structure, "
+                "not as file-content analysis."
+            )
 
     host_brand_terms = sorted(set(subdomain_subparts + path_parts + query_parts) & lexicon["impersonation_targets"])
     if host_brand_terms and phishing_terms:
