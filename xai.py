@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 from collections import Counter
 
 import numpy as np
@@ -31,6 +32,29 @@ RISK_AMPLIFIER_WORDS = {
     "wallet",
 }
 
+COMMON_BENIGN_CONTEXT_TOKENS = {
+    "client",
+    "confirm",
+    "delivery",
+    "document",
+    "download",
+    "file",
+    "install",
+    "pay",
+    "setup",
+    "tracking",
+    "update",
+}
+
+MALWARE_CONTEXT_TOKENS = {
+    "client",
+    "download",
+    "file",
+    "install",
+    "setup",
+    "update",
+}
+
 HIGH_RISK_FEATURES = {
     "has_userinfo",
     "host_is_ip",
@@ -49,18 +73,222 @@ HIGH_RISK_FEATURES = {
 }
 
 LOW_INFORMATION_DISPLAYS = {
+    "api",
+    "asp",
+    "aspx",
+    "by",
     "com",
     "co",
+    "example",
+    "html",
     "http",
     "https",
+    "id",
+    "index",
+    "message",
     "net",
+    "news",
     "org",
+    "page",
+    "php",
+    "test",
     "www",
 }
 
 
 def _clip01(value):
     return max(0.0, min(float(value), 1.0))
+
+
+def _is_char_ngram(feature):
+    return str(feature).startswith("char:")
+
+
+def _evidence_strength(item):
+    dictionary_score = float(item.get("dictionary_score", 0.0))
+    case_score = float(item.get("case_score", 0.0))
+    rule_factor = float(item.get("rule_factor", 1.0))
+    rule_reasons = set(item.get("rule_reasons") or [])
+
+    if dictionary_score > 0 and rule_factor > 1.0:
+        return "strong"
+    if dictionary_score > 0 or case_score > 0:
+        return "strong"
+    if (
+        rule_factor > 1.0
+        and str(item.get("display", "")).lower() not in LOW_INFORMATION_DISPLAYS
+        and rule_reasons - {"query-string context"}
+    ):
+        return "medium"
+    return "weak"
+
+
+def _is_human_meaningful(item):
+    display = str(item.get("display", "")).strip()
+    if not display:
+        return False
+    if item.get("category") == "character_ngram":
+        return False
+    if display.lower() in LOW_INFORMATION_DISPLAYS:
+        return False
+    if len(display) <= 1:
+        return False
+
+    return True
+
+
+def _classify_reason_source(reason):
+    text = str(reason).lower()
+    if "transformer" in text:
+        return "Transformer alignment"
+    if "page" in text or "html" in text or "form" in text or "ssl" in text:
+        return "Static page evidence"
+    if "query parameter" in text:
+        return "Query evidence"
+    if "extension" in text or "download" in text or "executable" in text:
+        return "File/URL structure"
+    if "brand" in text or "credential" in text or "phishing" in text:
+        return "Phishing context"
+    if "defacement" in text or "hacked" in text or "owned" in text:
+        return "Defacement context"
+    return "URL context"
+
+
+def _has_executable_extension_signal(url_reasons, top_evidence):
+    if any("executable file extension" in str(reason).lower() for reason in url_reasons):
+        return True
+
+    return any(
+        item.get("category") == "file_extension"
+        and str(item.get("feature", "")).startswith("ext:")
+        for item in top_evidence
+    )
+
+
+def _has_download_context_signal(url_reasons, top_evidence):
+    context_terms = {"download", "update", "install", "setup", "client", "file"}
+    if any("download" in str(reason).lower() or "file path" in str(reason).lower() for reason in url_reasons):
+        return True
+
+    return any(str(item.get("display", "")).lower() in context_terms for item in top_evidence)
+
+
+def _is_common_context_token(item):
+    return str(item.get("display", "")).lower() in COMMON_BENIGN_CONTEXT_TOKENS
+
+
+def _is_ip_octet_token(item, url_reasons):
+    if not any("ip address" in str(reason).lower() for reason in url_reasons):
+        return False
+
+    display = str(item.get("display", ""))
+    feature = str(item.get("feature", ""))
+    return bool(
+        re.fullmatch(r"\d{1,3}", display)
+        and feature.startswith(("domain:", "dpart:", "tld:", "tldpart:", "sld:", "tok:"))
+    )
+
+
+def _presentation_strength(item, explanation_target, url_reasons, top_evidence):
+    raw_strength = item.get("strength", "weak")
+    if _is_ip_octet_token(item, url_reasons):
+        return "ip_octet"
+
+    if (
+        explanation_target == "malware"
+        and str(item.get("display", "")).lower() in MALWARE_CONTEXT_TOKENS
+        and item.get("category") != "file_extension"
+        and _has_executable_extension_signal(url_reasons, top_evidence)
+    ):
+        return "contextual"
+
+    if _is_common_context_token(item) and raw_strength == "strong":
+        return "supporting"
+
+    return raw_strength
+
+
+def _token_reason(item, explanation_target, url_reasons, top_evidence):
+    token = item["display"]
+    score = round(float(item["explanation_score"]) * 100, 1)
+    lower_token = str(token).lower()
+    has_executable = _has_executable_extension_signal(url_reasons, top_evidence)
+
+    if _is_ip_octet_token(item, url_reasons):
+        return (
+            f"{token} is one octet of an IP-address host, not an independent malicious token. "
+            "The explanation groups this signal under the structural host_is_ip evidence."
+        )
+
+    if str(item.get("feature", "")) == "host_is_ip":
+        return (
+            f"{token} is structural URL evidence indicating that the host is an IP address rather than a registered domain "
+            f"(E_i={score}%)."
+        )
+
+    if item.get("category") == "file_extension":
+        return (
+            f"{token} is treated as URL-level file-extension evidence with E_i={score}%. "
+            "This does not inspect the downloaded file itself; it only explains risk from the URL structure."
+        )
+
+    if (
+        explanation_target == "malware"
+        and lower_token in MALWARE_CONTEXT_TOKENS
+        and has_executable
+    ):
+        return (
+            f"{token} can also appear in benign software URLs, so it is not used as standalone malware proof. "
+            f"It increases the explanation score because it appears together with an executable file-extension/path pattern (E_i={score}%)."
+        )
+
+    if _is_common_context_token(item):
+        return (
+            f"{token} is a contextual token that can appear in benign URLs; "
+            f"its evidence is interpreted only with surrounding URL structure (E_i={score}%)."
+        )
+
+    return (
+        f"{token} matched as {item['strength']} token evidence "
+        f"with E_i={score}%."
+    )
+
+
+def _transformer_alignment_text(score, top_evidence):
+    score = _clip01(score)
+    strong_tokens = [
+        item["display"]
+        for item in top_evidence
+        if item.get("strength") == "strong"
+    ][:3]
+
+    if score >= 0.15 and strong_tokens:
+        return (
+            "Transformer saliency is aligned with the lexicon evidence around "
+            + ", ".join(strong_tokens)
+            + "."
+        )
+    if score > 0 and strong_tokens:
+        return (
+            "Transformer alignment is weak, so the risk explanation mainly relies on URL lexicon evidence; "
+            "the aligned token signal is "
+            + ", ".join(strong_tokens)
+            + "."
+        )
+    if score > 0:
+        return "Transformer alignment is present but does not dominate the explanation."
+
+    return "Transformer alignment did not add meaningful support for this risk label."
+
+
+def _risk_label_text(label):
+    mapping = {
+        "phishing": "phishing risk",
+        "malware": "malware distribution risk",
+        "defacement": "defacement risk",
+        "benign": "low-risk/benign",
+    }
+    return mapping.get(str(label), f"{label} risk")
 
 
 def _feature_display(feature):
@@ -432,7 +660,13 @@ def build_xai_explanation(
         if str(display).lower() in LOW_INFORMATION_DISPLAYS and not has_external_evidence:
             continue
 
+        if str(display).lower() in LOW_INFORMATION_DISPLAYS and dictionary_score <= 0 and case_score <= 0:
+            continue
+
         if len(str(display)) <= 1 and not has_external_evidence:
+            continue
+
+        if _is_char_ngram(feature) and not has_external_evidence:
             continue
 
         explanation_score = (
@@ -445,7 +679,7 @@ def build_xai_explanation(
         if explanation_score <= 0 and dictionary_score <= 0:
             continue
 
-        evidence.append({
+        evidence_item = {
             "feature": feature,
             "display": display,
             "category": _feature_category(feature),
@@ -458,12 +692,20 @@ def build_xai_explanation(
             "rule_factor": round(rule_factor, 4),
             "rule_reasons": rule_reasons,
             "explanation_score": round(explanation_score, 4),
-        })
+        }
+        evidence_item["strength"] = _evidence_strength(evidence_item)
+        evidence_item["human_meaningful"] = _is_human_meaningful(evidence_item)
+        evidence.append(evidence_item)
 
     evidence.sort(key=lambda item: item["explanation_score"], reverse=True)
+    meaningful_evidence = [item for item in evidence if item["human_meaningful"]]
+    internal_saliency_evidence = [
+        item for item in evidence
+        if item["category"] == "character_ngram" and not item["human_meaningful"]
+    ][:10]
     deduplicated_evidence = []
     seen_display = set()
-    for item in evidence:
+    for item in meaningful_evidence:
         display_key = str(item["display"]).lower()
         if display_key in seen_display:
             continue
@@ -472,23 +714,133 @@ def build_xai_explanation(
         deduplicated_evidence.append(item)
 
     top_evidence = deduplicated_evidence[:10]
-    top_scores = [item["explanation_score"] for item in top_evidence[:5]]
-    mean_top_score = float(np.mean(top_scores)) if top_scores else 0.0
-
-    top_terms = ", ".join(item["display"] for item in top_evidence[:3]) or "no dominant token"
     decision_evidence = prediction_result.get("evidence_decision") or {}
     url_reasons = decision_evidence.get("url_reasons") or []
     page_reasons = decision_evidence.get("page_reasons") or []
+    if any("ip address" in str(reason).lower() for reason in url_reasons):
+        top_evidence = [
+            item for item in top_evidence
+            if not _is_ip_octet_token(item, url_reasons)
+        ][:10]
+
+    top_scores = [
+        item["explanation_score"]
+        for item in top_evidence[:5]
+        if item["strength"] in {"strong", "medium"}
+    ]
+    mean_top_score = float(np.mean(top_scores)) if top_scores else 0.0
+
+    strong_terms = [
+        item["display"]
+        for item in top_evidence
+        if item["strength"] == "strong"
+        and not _is_ip_octet_token(item, url_reasons)
+        and not (
+            explanation_target == "malware"
+            and str(item.get("display", "")).lower() in MALWARE_CONTEXT_TOKENS
+            and item.get("category") != "file_extension"
+        )
+    ][:3]
+    top_terms = ", ".join(strong_terms) or ", ".join(
+        item["display"] for item in top_evidence[:3]
+    ) or "no dominant token"
     primary_reasons = url_reasons[:2] or page_reasons[:2]
     decision_risk_score = _clip01(decision_evidence.get("risk_score", 0.0))
     decision_url_score = _clip01(decision_evidence.get("url_score", 0.0))
     decision_page_score = _clip01(decision_evidence.get("page_score", 0.0))
     decision_transformer_score = _clip01(decision_evidence.get("transformer_alignment_score", 0.0))
+    has_executable_signal = _has_executable_extension_signal(url_reasons, top_evidence)
+    has_download_context = _has_download_context_signal(url_reasons, top_evidence)
     decision_items = []
+    main_evidence = []
+    strong_evidence = []
+    supporting_evidence = []
+
+    for reason in primary_reasons[:3]:
+        main_evidence.append({
+            "source": _classify_reason_source(reason),
+            "reason": reason,
+        })
+
+    if any("ip address" in str(reason).lower() for reason in url_reasons):
+        main_evidence.append({
+            "source": "IP host normalization",
+            "reason": (
+                "The numeric host components are treated as parts of one IPv4 host, "
+                "not as separate domain/TLD risk tokens."
+            ),
+        })
+
+    if explanation_target == "malware" and has_executable_signal:
+        has_delivery_words = any(
+            str(item.get("display", "")).lower() in {"download", "update", "install", "setup", "client", "file"}
+            for item in top_evidence
+        )
+        if has_delivery_words:
+            main_evidence.append({
+                "source": "Contextual combination",
+                "reason": (
+                    "Common software-delivery words such as download/update are not treated as malicious by themselves; "
+                    "the risk increases because they appear together with an executable file-extension or file-path pattern."
+                ),
+            })
+        else:
+            main_evidence.append({
+                "source": "File-delivery structure",
+                "reason": (
+                    "The executable extension is interpreted as a URL-level file-delivery structure, "
+                    "not as analysis of the file contents."
+                ),
+            })
+
+    for item in top_evidence:
+        token_reason = _token_reason(item, explanation_target, url_reasons, top_evidence)
+        item["presentation_strength"] = _presentation_strength(
+            item,
+            explanation_target,
+            url_reasons,
+            top_evidence,
+        )
+        is_ip_octet_token = _is_ip_octet_token(item, url_reasons)
+        is_contextual_malware_token = (
+            explanation_target == "malware"
+            and str(item.get("display", "")).lower() in MALWARE_CONTEXT_TOKENS
+            and item.get("category") != "file_extension"
+        )
+        evidence_record = {
+            "source": (
+                "IP host component"
+                if is_ip_octet_token
+                else "Contextual token evidence"
+                if is_contextual_malware_token
+                else "Token evidence"
+            ),
+            "reason": token_reason,
+            "token": item["display"],
+            "strength": item["presentation_strength"],
+            "score": item["explanation_score"],
+        }
+        if item["strength"] == "strong" and not is_contextual_malware_token and not is_ip_octet_token:
+            strong_evidence.append(evidence_record)
+        elif item["strength"] in {"strong", "medium"}:
+            supporting_evidence.append(evidence_record)
+
+    supporting_evidence.append({
+        "source": "Transformer alignment",
+        "reason": _transformer_alignment_text(decision_transformer_score, top_evidence),
+        "score": round(decision_transformer_score, 4),
+    })
+
+    if page_reasons:
+        supporting_evidence.append({
+            "source": "Static page evidence",
+            "reason": page_reasons[0],
+            "score": round(decision_page_score, 4),
+        })
 
     for reason in url_reasons[:4]:
         decision_items.append({
-            "source": "URL context",
+            "source": _classify_reason_source(reason),
             "reason": reason,
             "score": round(decision_url_score, 4),
         })
@@ -503,7 +855,7 @@ def build_xai_explanation(
     if decision_transformer_score > 0:
         decision_items.append({
             "source": "Transformer alignment",
-            "reason": "Transformer-token alignment supported the URL-level evidence.",
+            "reason": "Transformer-token alignment was consistent with the URL-level risk evidence.",
             "score": round(decision_transformer_score, 4),
         })
 
@@ -516,23 +868,23 @@ def build_xai_explanation(
         if primary_reasons:
             reason_text = " ".join(primary_reasons)
             summary = (
-                f"The model classified the URL as benign because the integrated evidence score "
+                f"The system marked the URL as low-risk/benign because the integrated evidence score "
                 f"remained below the risk threshold. Main evidence: {reason_text}"
             )
         else:
             summary = (
-                f"The model classified the URL as benign because no strong contextual URL, "
+                f"The system marked the URL as low-risk/benign because no strong contextual URL, "
                 f"Transformer-alignment, or static page risk evidence was found."
             )
     elif primary_reasons:
         reason_text = " ".join(primary_reasons)
         summary = (
-            f"The model classified the URL as {explanation_target}. Main decision evidence: "
-            f"{reason_text} Supporting token-level signals include {top_terms}."
+            f"The system indicated {_risk_label_text(explanation_target)} based on URL-level evidence. Main risk evidence: "
+            f"{reason_text} Main token evidence: {top_terms}."
         )
     else:
         summary = (
-            f"The model classified the URL as {explanation_target}. The strongest explanation signals "
+            f"The system indicated {_risk_label_text(explanation_target)}. The strongest explanation signals "
             f"were {top_terms}, combining URL token saliency, risk dictionary evidence, "
             f"context rules, static page evidence, and similar URL cases."
         )
@@ -554,6 +906,14 @@ def build_xai_explanation(
         "xai_confidence": round(xai_confidence, 4),
         "mean_top_evidence_score": round(mean_top_score, 4),
         "top_evidence": top_evidence,
+        "internal_saliency_evidence": internal_saliency_evidence,
+        "main_evidence": main_evidence,
+        "strong_evidence": strong_evidence[:5],
+        "supporting_evidence": supporting_evidence[:6],
+        "transformer_alignment_explanation": _transformer_alignment_text(
+            decision_transformer_score,
+            top_evidence,
+        ),
         "primary_decision_reasons": primary_reasons,
         "decision_evidence": decision_items,
         "similar_cases": similar_cases,

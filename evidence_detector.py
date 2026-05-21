@@ -31,6 +31,26 @@ def _load_evidence_lexicon(path=EVIDENCE_LEXICON_PATH):
 
 EVIDENCE_LEXICON = _load_evidence_lexicon()
 
+NEUTRAL_URL_TERMS = {
+    "api",
+    "asp",
+    "aspx",
+    "by",
+    "com",
+    "example",
+    "html",
+    "id",
+    "index",
+    "message",
+    "net",
+    "news",
+    "org",
+    "page",
+    "php",
+    "test",
+    "www",
+}
+
 
 def _feature_value(feature):
     if ":" not in feature:
@@ -44,6 +64,8 @@ def _valid_learned_term(value):
     if len(value) < 3 or len(value) > 32:
         return False
     if value.isdigit():
+        return False
+    if value in NEUTRAL_URL_TERMS:
         return False
 
     return bool(re.search(r"[a-z]", value))
@@ -166,6 +188,37 @@ def _split_parts(text):
     return [part for part in re.split(r"[^a-zA-Z0-9]+", text or "") if part]
 
 
+def _query_evidence_reasons(query, lexicon):
+    reasons = []
+    try:
+        query_pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
+    except Exception:
+        query_pairs = []
+
+    evidence_terms = (
+        lexicon["risk_terms"]
+        | lexicon["phishing_intent_terms"]
+        | lexicon["defacement_terms"]
+        | lexicon["malware_terms"]
+    )
+
+    for key, value in query_pairs:
+        key = str(key or "").strip()
+        value = str(value or "").strip()
+        value_parts = set(_split_parts(value.lower()))
+        matched = sorted(value_parts & evidence_terms)
+        if not key or not value or not matched:
+            continue
+
+        reasons.append(
+            f"Query parameter '{key}={value[:80]}' contains risk term(s): "
+            + ", ".join(matched[:5])
+            + "."
+        )
+
+    return reasons
+
+
 def _second_level_domain(host_parts):
     if len(host_parts) < 2:
         return ""
@@ -173,27 +226,36 @@ def _second_level_domain(host_parts):
     return host_parts[-2]
 
 
+def _is_ipv4_host(host):
+    return bool(re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", str(host or "")))
+
+
 def _learned_risk_features(parsed, host, host_parts, path, query):
     features = set()
     path_parts = _split_parts(path)
     query_pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
+    is_ipv4_host = _is_ipv4_host(host)
 
-    if host_parts:
+    if is_ipv4_host:
+        features.add("host_is_ip")
+        if host:
+            features.add(f"domain:{host}")
+    elif host_parts:
         features.add(f"tld:{host_parts[-1]}")
 
-    if len(host_parts) >= 2:
-        features.add(f"sld:{host_parts[-2]}")
+        if len(host_parts) >= 2:
+            features.add(f"sld:{host_parts[-2]}")
 
-    if len(host_parts) >= 3:
-        features.add("subdomain:" + ".".join(host_parts[:-2]))
+        if len(host_parts) >= 3:
+            features.add("subdomain:" + ".".join(host_parts[:-2]))
 
-    if host:
-        features.add(f"domain:{host}")
+        if host:
+            features.add(f"domain:{host}")
 
-    for part in host_parts:
-        features.add(f"dpart:{part}")
-        features.add(f"domain:{part}")
-        features.add(f"tok:{part}")
+        for part in host_parts:
+            features.add(f"dpart:{part}")
+            features.add(f"domain:{part}")
+            features.add(f"tok:{part}")
 
     for part in path_parts:
         features.add(f"path:{part}")
@@ -213,9 +275,6 @@ def _learned_risk_features(parsed, host, host_parts, path, query):
             features.add(f"qv:{part}")
             features.add(f"tok:{part}")
 
-    if re.search(r"\d{1,3}(\.\d{1,3}){3}", host):
-        features.add("host_is_ip")
-
     if parsed.scheme == "http":
         features.add("scheme:http")
 
@@ -229,6 +288,8 @@ def _feature_context_weight(feature, host_parts):
     tld = host_parts[-1] if host_parts else ""
 
     if prefix in {"path", "pseg", "qkey", "qk", "qv"}:
+        if value in NEUTRAL_URL_TERMS:
+            return 0.12, "neutral path/query token"
         return 1.0, "contextual path/query token"
 
     if prefix == "subdomain":
@@ -331,6 +392,7 @@ def _url_evidence(url, learned_risk_dict=None):
         "malware": 0.0,
     }
     score = 0.0
+    reasons.extend(_query_evidence_reasons(query, lexicon))
 
     if "@" in clean:
         score += 0.25
@@ -342,7 +404,9 @@ def _url_evidence(url, learned_risk_dict=None):
         type_scores["phishing"] += 0.04
         reasons.append("URL contains percent-encoded characters.")
 
-    if re.search(r"\d{1,3}(\.\d{1,3}){3}", host):
+    is_ipv4_host = _is_ipv4_host(host)
+
+    if is_ipv4_host:
         score += 0.30
         reasons.append("Host is represented as an IP address.")
 
@@ -350,7 +414,7 @@ def _url_evidence(url, learned_risk_dict=None):
         score += 0.10
         reasons.append("URL is unusually long.")
 
-    if len(host_parts) >= 4:
+    if len(host_parts) >= 4 and not is_ipv4_host:
         score += 0.08
         reasons.append("Host contains many domain parts.")
 
@@ -378,7 +442,7 @@ def _url_evidence(url, learned_risk_dict=None):
                     f"Look-alike normalized domain matches a high-value impersonation target: {normalized_sld}."
                 )
 
-    if host_parts and host_parts[-1] in lexicon["risk_tlds"]:
+    if host_parts and not is_ipv4_host and host_parts[-1] in lexicon["risk_tlds"]:
         score += 0.16
         reasons.append(f"TLD '.{host_parts[-1]}' is commonly abused in phishing campaigns.")
 
@@ -388,11 +452,11 @@ def _url_evidence(url, learned_risk_dict=None):
             if ext in lexicon["compressed_extensions"]:
                 score += 0.28
                 type_scores["malware"] += 0.22
-                reasons.append(f"URL points to a compressed download file '.{ext}'.")
+                reasons.append(f"URL contains a compressed download file indicator '.{ext}'.")
             else:
                 score += 0.40
                 type_scores["malware"] += 0.34
-                reasons.append(f"URL points to a risky executable file extension '.{ext}'.")
+                reasons.append(f"URL contains an executable file extension risk indicator '.{ext}'.")
 
     matched_terms = sorted(contextual_parts & lexicon["risk_terms"])
     if matched_terms:
@@ -411,7 +475,8 @@ def _url_evidence(url, learned_risk_dict=None):
         score += defacement_score
         type_scores["defacement"] += defacement_score
         reasons.append("Defacement-related terms in URL: " + ", ".join(defacement_terms[:5]) + ".")
-        if last_path_segment.endswith((".html", ".htm", ".php")):
+        path_defacement_terms = set(path_parts) & lexicon["defacement_terms"]
+        if path_defacement_terms and last_path_segment.endswith((".html", ".htm", ".php")):
             score += 0.08
             type_scores["defacement"] += 0.08
             reasons.append("Defacement term appears in a web page filename.")
@@ -421,7 +486,19 @@ def _url_evidence(url, learned_risk_dict=None):
         malware_lure_score = min(0.30, 0.12 + 0.06 * len(malware_terms))
         score += malware_lure_score
         type_scores["malware"] += malware_lure_score
-        reasons.append("Download/malware lure terms near a file path: " + ", ".join(malware_terms[:5]) + ".")
+        context_terms = [term for term in malware_terms if term != "exe"]
+        if context_terms:
+            reasons.append(
+                "Software-delivery terms appear near a file path; these terms can be benign alone, "
+                "but add malware-distribution risk when combined with executable or download-path structure: "
+                + ", ".join(malware_terms[:5])
+                + "."
+            )
+        elif "exe" in malware_terms:
+            reasons.append(
+                "The executable extension is interpreted as a file-delivery URL structure, "
+                "not as file-content analysis."
+            )
 
     host_brand_terms = sorted(set(subdomain_subparts + path_parts + query_parts) & lexicon["impersonation_targets"])
     if host_brand_terms and phishing_terms:
@@ -459,7 +536,11 @@ def _page_evidence_score(page_evidence):
         return 0.0, ["Live page evidence was not collected."]
 
     if not page_evidence.get("fetched"):
-        return 0.08, [f"Live page could not be fetched: {page_evidence.get('error') or 'unknown error'}."]
+        error = page_evidence.get("error") or "unknown error"
+        if error in {"dns_resolution_failed", "http_error"}:
+            return 0.08, [f"Live page evidence unavailable for this test URL ({error})."]
+
+        return 0.08, [f"Live page evidence unavailable ({error})."]
 
     if not page_evidence.get("html_analyzed"):
         return 0.05, ["Fetched resource was not HTML, so page-level phishing signals were limited."]
