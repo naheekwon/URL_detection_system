@@ -1021,7 +1021,7 @@
                 <h2>About LinkWatcher</h2>
                 <p>
                     LinkWatcher는 사용자가 의심스러운 URL을 클릭하기 전에 위험 여부를 확인할 수 있도록 설계된 AI 기반 URL 탐지 웹서비스입니다.
-                    피싱, 악성코드, 스팸성 URL과 같은 웹 기반 보안 위협을 분석하고, 사용자가 보다 안전하게 웹 환경을 이용할 수 있도록 지원합니다.
+                    피싱, 악성코드 유포, 디페이스먼트 URL과 같은 웹 기반 보안 위협을 분석하고, 사용자가 보다 안전하게 웹 환경을 이용할 수 있도록 지원합니다.
                 </p>
 
                 <div class="info-list">
@@ -1039,7 +1039,7 @@
                         style="--delay: 0.10s;"
                     >
                         <strong>Target</strong>
-                        <span>피싱, 악성코드, 스팸, 정상 URL</span>
+                        <span>피싱, 악성코드, 디페이스먼트, 정상 URL</span>
                     </div>
                     <div 
                         class="info-item scroll-reveal" 
@@ -1047,7 +1047,7 @@
                         style="--delay: 0.16s;"
                     >
                         <strong>Project Type</strong>
-                        <span>졸업작품 및 AI 보안 학과 프로젝트</span>
+                        <span>AI 기반 URL 탐지 프로젝트</span>
                     </div>
                 </div>
             </div>
@@ -1062,7 +1062,7 @@
                 <h2>Detection Model</h2>
                 <p>
                     LinkWatcher의 탐지 모델은 URL 문자열에서 추출한 토큰, 도메인 구조, 경로 패턴, 의심 키워드 등의 특징을 기반으로
-                    URL을 다중 클래스로 분류합니다. 단순히 안전/위험 여부만 출력하는 것이 아니라, 피싱, 악성코드, 스팸, 정상 URL과 같이
+                    URL을 다중 클래스로 분류합니다. 단순히 안전/위험 여부만 출력하는 것이 아니라, 피싱, 악성코드, 디페이스먼트, 정상 URL과 같이
                     구체적인 위협 유형을 구분하는 것을 목표로 합니다.
                 </p>
 
@@ -1073,15 +1073,15 @@
                         style="--delay: 0.04s;"
                     >
                         <strong>Multiclass Classification</strong>
-                        <span>Benign, Phishing, Malware, Spam URL 분류</span>
+                        <span>Benign, Phishing, Malware, Defacement URL 분류</span>
                     </div>
                     <div 
                         class="info-item scroll-reveal" 
                         data-motion="rise"
                         style="--delay: 0.10s;"
                     >
-                        <strong>Risk Token Analysis</strong>
-                        <span>URL 내 위험 토큰과 의심 패턴 분석</span>
+                        <strong>Risk Evidence Fusion</strong>
+                        <span>위험 토큰, Transformer 중요도, 정적 페이지 evidence 통합 분석</span>
                     </div>
                     <div 
                         class="info-item scroll-reveal" 
@@ -1089,7 +1089,7 @@
                         style="--delay: 0.16s;"
                     >
                         <strong>Explainable Output</strong>
-                        <span>탐지 결과와 함께 판단 근거 제공</span>
+                        <span>토큰·문맥·페이지 근거를 함께 시각화</span>
                     </div>
                 </div>
 
