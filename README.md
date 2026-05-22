@@ -16,11 +16,9 @@
 
 ## 아키텍처
 
-현재 구현된 웹서비스와 XAI 흐름은 다음과 같습니다.
+현재 구현된 서비스의 아키텍처는 다음과 같습니다.
 
 ![LinkWatcher Architecture](frontend/architecture.png)
-
-주요 흐름은 다음과 같습니다.
 
 1. URL 데이터셋과 URL 토큰화를 기반으로 위험 근거 통합 모듈을 구성합니다.
 2. 사용자가 실시간으로 URL을 입력하면 멀티클래스 탐지 엔진이 URL을 분류합니다.
@@ -98,27 +96,6 @@ E_i = (0.45*A_i + 0.30*D_i + 0.25*K_i) * R_i
 - 제안 수식과 세부 score
 
 즉, 단순히 `phishing` 또는 `benign`만 출력하는 것이 아니라, 어떤 URL 토큰과 페이지 구조가 판정에 영향을 주었는지 함께 확인할 수 있습니다.
-
-
-<br/>
-
-
-<br/>
-
-## 주요 파일 구조
-
-```text
-app.py                         Flask 백엔드 및 예측 API
-xai.py                         XAI 결과 생성 모듈
-evidence_detector.py           Lexicon-Context evidence 계산
-page_evidence.py               정적 페이지 evidence 수집
-frontend/index.html            웹 프론트엔드
-frontend/architecture.png      시스템 아키텍처 그림
-artifacts_transformer/         URL 분류 모델 및 위험 사전 산출물
-artifacts_phiusiil_meta_gate/  meta-gate/calibration 산출물
-transformer_final.py           모델 학습/실험용 스크립트
-rebuild_risk_dict.py           위험토큰 사전 재생성 스크립트
-```
 
 <br/>
 
