@@ -1235,7 +1235,7 @@
             const evidenceDecision = data.evidence_decision || null;
             const barWidth = (value) => Math.max(0, Math.min(100, Number(value || 0) * 100)).toFixed(1);
             const componentBars = evidenceDecision ? [
-                ['Final risk', evidenceDecision.risk_score, '#0f172a'],
+                ['Integrated risk signal', evidenceDecision.risk_score, '#0f172a'],
                 ['URL lexicon', evidenceDecision.url_score, '#2563eb'],
                 ['Transformer alignment', evidenceDecision.transformer_alignment_score, '#7c3aed'],
                 ['Static page evidence', evidenceDecision.page_score, '#16a34a']
@@ -1528,7 +1528,7 @@
                             <div class="metric"><span>Explanation target</span><strong>${escapeHtml(xai.explanation_target_prediction || data.prediction)}</strong></div>
                             <div class="metric"><span>Model method</span><strong>${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</strong></div>
                             <div class="metric"><span>Model confidence</span><strong>${pct(data.confidence)}</strong></div>
-                            <div class="metric"><span>Evidence strength</span><strong>${pct(xai.xai_confidence)}</strong></div>
+                            <div class="metric"><span>Evidence signal</span><strong>${pct(xai.xai_confidence)}</strong></div>
                             <div class="metric"><span>Top evidence mean</span><strong>${pct(xai.mean_top_evidence_score)}</strong></div>
                         </section>
 
@@ -1551,7 +1551,7 @@
                             <h2>Proposed formula</h2>
                             <code>${escapeHtml(xai.formula)}</code>
                             <code>${escapeHtml(xai.confidence_formula)}</code>
-                            <p class="viz-note">The formula computes token-level E_i. The URL risk label is explained by the integrated evidence score below.</p>
+                            <p class="viz-note">The formula computes token-level E_i. The URL risk label is explained by the integrated evidence signal below, not by file-content inspection.</p>
                             <p class="viz-note">${escapeHtml(xai.transformer_alignment_explanation || '')}</p>
                         </section>
 
@@ -1559,7 +1559,7 @@
                             <div class="viz-box">
                                 <h2>Evidence contribution graph</h2>
                                 ${componentBars || '<p class="viz-note">No component score data.</p>'}
-                                <p class="viz-note">Final risk is calculated from URL lexicon evidence, Transformer-token alignment, and static page evidence.</p>
+                                <p class="viz-note">The integrated risk signal summarizes URL lexicon evidence, Transformer-token alignment, and static page evidence. It is an explanation signal, not a guarantee that downloaded content was analyzed.</p>
                             </div>
                             <div class="viz-box">
                                 <h2>Top token evidence graph</h2>

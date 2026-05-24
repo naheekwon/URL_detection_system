@@ -892,7 +892,7 @@ def build_xai_explanation(
     return {
         "method": "Lexicon-Context Guided XAI",
         "formula": "E_i = (0.45*A_i + 0.30*D_i + 0.25*K_i) * R_i",
-        "confidence_formula": "XAI(x) = P(y|x) * mean(top-k E_i)",
+        "confidence_formula": "XAI(x) = evidence signal from model confidence and top-k explanation scores",
         "decision_module": "Lexicon-Context Evidence Model",
         "weights": {
             "token_saliency": ALPHA_TRANSFORMER,
