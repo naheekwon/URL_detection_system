@@ -81,19 +81,26 @@ Conf(x) = 0.55 + 0.35 * normalized_distance_from_threshold
 
 <br/>
 
-## AI 도구 활용 전략(Prompting Log)
+## AI 도구 활용 전략 (Prompting Log)
 
-본 프로젝트에서는 AI 도구를 단순 코드 생성이 아니라 설계 검토, XAI 품질 개선, 문서화 보조에 활용했습니다.
+본 프로젝트에서는 AI 도구(Codex, ChatGPT)를 단순 코드 생성기가 아니라,  
+구현 후보를 제안하는 개발 보조 도구 형태로 활용하였다.
 
-| 활용 단계 | 프롬프트 목적 | 반영 내용 |
-| --- | --- | --- |
-| 아키텍처 정리 | URL 탐지 시스템 흐름과 XAI 모듈 구조를 설명 가능한 형태로 정리 | 시스템 아키텍처 도식 및 README 구조 개선 |
-| XAI 품질 개선 | 위험토큰 사전만 나열하는 설명의 한계를 점검 | 위험토큰 + Transformer alignment + 정적 evidence 결합 설명으로 개선 |
-| 설명 문구 보정 | `.exe`, `download`, `confirm`, IP host 등 애매한 근거의 표현을 검토 | 단독 위험 근거와 문맥 근거를 구분하고, 파일 내용 분석이 아님을 명시 |
-| 코드 검증 | Flask 실행, XAI 출력, 브랜치별 변경사항 확인 | 로컬 실행 및 `py_compile` 기반 기본 검증 |
-| 발표 문서화 | 프로젝트 설명, 실행 방법, 한계점 정리 | README 및 웹서비스 현황 문서 작성 보조 |
+| 활용 영역 | AI 활용 내용 |
+| --- | --- |
+| 구현 보조 | Flask API, XAI JSON 구조, frontend 개선 방향 탐색 |
+| 디버깅 | 오류 원인 후보 분석 및 수정안 비교 |
+| XAI 개선 | 위험토큰 단일 설명의 한계를 분석하고 context-aware evidence 구조로 확장 |
+| Git 관리 | commit message 초안, cleanup 전략, 변경사항 요약 |
+| 문서화 | README 및 발표 자료 구조 정리 |
 
-AI 도구의 제안은 그대로 사용하지 않고, 실제 코드 구조와 실행 결과를 확인한 뒤 프로젝트 범위에 맞게 수정하여 반영했습니다.
+특히 다음 workflow를 유지하며 AI의 제안을 검증 후 반영하였다.
+
+```text
+Ask → AI에게 구현 후보/원인 분석 요청
+Review → diff 및 영향 범위 직접 검토
+Apply → 필요한 수정만 선택 반영
+Commit → Git 기반으로 작업 기록 관리
 
 <br/>
 
