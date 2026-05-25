@@ -81,6 +81,7 @@ Conf(x) = 0.55 + 0.35 * normalized_distance_from_threshold
 
 <br/>
 
+
 ## AI 도구 활용 전략 (Prompting Log)
 
 본 프로젝트에서는 AI 도구(Codex, ChatGPT)를 단순 코드 생성기가 아니라,  
@@ -101,10 +102,14 @@ Ask → AI에게 구현 후보/원인 분석 요청
 Review → diff 및 영향 범위 직접 검토
 Apply → 필요한 수정만 선택 반영
 Commit → Git 기반으로 작업 기록 관리
+```
+
+AI 도구의 제안은 그대로 사용하지 않고,  
+실제 코드 구조와 실행 결과를 확인한 뒤 프로젝트 범위에 맞게 수정하여 반영하였다.
 
 <br/>
 
-## 실행 방법(How to run)
+## 실행 방법 (How to run)
 
 프로젝트 루트에서 다음 명령어를 실행합니다.
 
@@ -124,7 +129,6 @@ http://127.0.0.1:8765
 ```text
 http://<실행 PC의 IPv4 주소>:8765
 ```
-
 <br/>
 
 ## 현재 한계
