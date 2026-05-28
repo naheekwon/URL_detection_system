@@ -85,27 +85,29 @@ Conf(x) = 0.55 + 0.35 * normalized_distance_from_threshold
 ## AI 도구 활용 전략 (Prompting Log)
 
 본 프로젝트에서는 AI 도구(Codex, ChatGPT)를 단순 코드 생성기가 아니라,  
-구현 후보를 제안하는 개발 보조 도구 형태로 활용하였다.
+구현 방향 검토, 오류 원인 분석, Git 관리, 디렉토리 정리, 문서화와 발표 자료 구성을 보조하는 개발 협업 도구로 활용하였다.
 
-| 활용 영역 | AI 활용 내용 |
-| --- | --- |
-| 구현 보조 | Flask API, XAI JSON 구조, frontend 개선 방향 탐색 |
-| 디버깅 | 오류 원인 후보 분석 및 수정안 비교 |
-| XAI 개선 | 위험토큰 단일 설명의 한계를 분석하고 context-aware evidence 구조로 확장 |
-| Git 관리 | commit message 초안, cleanup 전략, 변경사항 요약 |
-| 문서화 | README 및 발표 자료 구조 정리 |
+| 구분 | Prompting 내용 | 반영 결과 |
+| --- | --- | --- |
+| 백엔드 구현 보조 | Flask API 구조, URL 분석 요청/응답 JSON, XAI 상세 응답 구성에 대해 조언을 요청 | `/api/predict`, `/health`, `/api/backend-info` 흐름과 XAI JSON 응답 구조를 정리 |
+| XAI 개선 | 위험토큰 단일 설명의 한계와 context-aware evidence 구조 확장 방향을 질문 | 위험 토큰, Transformer-token alignment, 정적 페이지 evidence를 결합하는 설명 구조로 개선 |
+| 프론트엔드 문구 검토 | 웹 화면 문구가 실제 모델 클래스와 동작에 맞는지 검토 요청 | `Safe URL`, `Spam` 등 부정확하거나 과장된 표현을 `benign`, `phishing`, `malware`, `defacement` 기준 문구로 수정 |
+| Git 관리 | 브랜치 이동, 로컬/원격 차이 확인, `feat:` 형식 커밋 메시지, push 상태 확인을 요청 | 기능별 브랜치와 커밋 히스토리를 유지하고 GitHub 반영 상태를 점검 |
+| 디렉토리 정리 | 어떤 파일이 실행에 필요하고 어떤 파일이 삭제 가능한지 검토 요청 |
+| 문서화 | 작업 과정에서 프로젝트 버전 관리를 위한 md 파일 문서화 | README, `PROJECT_RESULT_PRESENTATION.md`, `FINAL_ARCHITECTURE_CREATIVITY_PRESENTATION.md` 등 발표용 문서 정리 |
+| GitHub commit history 요약 | 커밋 히스토리를 발표용 그래프와 정량 요약으로 정리 요청 | `git_commit/` 디렉토리에 커밋 활동 그래프 생성 요청|
 
-특히 다음 workflow를 유지하며 AI의 제안을 검증 후 반영하였다.
+특히 다음 workflow를 유지하며 AI의 제안을 검증 후 반영하였다. 
 
 ```text
-Ask → AI에게 구현 후보/원인 분석 요청
-Review → diff 및 영향 범위 직접 검토
-Apply → 필요한 수정만 선택 반영
-Commit → Git 기반으로 작업 기록 관리
+Ask → AI에게 구현 후보, 오류 원인, 문서 구조, Git 관리 방향 질문
+Review → 실제 코드 diff, 실행 결과, Git 상태, 프로젝트 범위 직접 검토
+Apply → 필요한 수정만 선택적으로 반영
+Commit → Git 기반으로 변경 이력과 작업 근거 관리
 ```
 
 AI 도구의 제안은 그대로 사용하지 않고,  
-실제 코드 구조와 실행 결과를 확인한 뒤 프로젝트 범위에 맞게 수정하여 반영하였다.
+실제 코드 구조, 실행 결과, GitHub 반영 상태를 확인한 뒤 프로젝트 목적에 맞는 내용만 선별하여 반영하였다.
 
 <br/>
 
