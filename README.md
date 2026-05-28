@@ -111,10 +111,11 @@ AI 도구의 제안은 그대로 사용하지 않고,
 
 ## 실행 방법 (How to run)
 
-프로젝트 루트에서 다음 명령어를 실행합니다.
+프로젝트 루트에서 필요한 패키지를 설치한 뒤 Flask 서버를 실행합니다.
 
 ```powershell
-cd "C:\Users\CSOS\Desktop\졸업작품_나희\phishing-url-detection"
+cd "C:\Users\CSOS\Desktop\url_detection_web\phishing-url-detection"
+C:\Users\CSOS\anaconda3\python.exe -m pip install -r requirements.txt
 C:\Users\CSOS\anaconda3\python.exe app.py
 ```
 
@@ -122,6 +123,13 @@ C:\Users\CSOS\anaconda3\python.exe app.py
 
 ```text
 http://127.0.0.1:8765
+```
+
+만약 8765 포트가 이미 사용 중이면 다음처럼 다른 포트를 지정할 수 있습니다.
+
+```powershell
+$env:PORT="8766"
+C:\Users\CSOS\anaconda3\python.exe app.py
 ```
 
 같은 네트워크의 다른 PC에서 접속할 경우, 실행 PC의 IPv4 주소를 확인한 뒤 다음 형식으로 접속합니다.
@@ -137,3 +145,4 @@ http://<실행 PC의 IPv4 주소>:8765
 - JavaScript 실행 후 동적으로 변하는 페이지는 완전 분석하지 않습니다.
 - 실시간 사용 중 모델이 자동으로 계속 재학습되는 구조는 아닙니다.
 - live page evidence는 네트워크 상태, 차단, DNS 실패, HTTP 오류에 영향을 받을 수 있습니다.
+
