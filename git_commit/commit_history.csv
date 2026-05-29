@@ -1,0 +1,67 @@
+﻿date,short,subject
+2026-05-02,33f34f0,Add frontend index page
+2026-05-02,ddecc4a,Add tuned phishing results
+2026-05-05,00f901a,Add improved phishing detection script
+2026-05-05,288c5f6,Update README.md
+2026-05-05,4121930,Update README.md
+2026-05-05,55ef71e,Clean up README.md by removing extra line breaks
+2026-05-05,9236c99,Update README with architecture image and formatting
+2026-05-05,abe46d0,Update frontend page
+2026-05-05,b52c560,Update README.md
+2026-05-05,cbd70a4,Revise README for LinkWatcher project details
+2026-05-05,d08dbc8,Merge pull request #2 from naheekwon/update-frontend-page
+2026-05-05,d0f03b4,Enhance README with project details and image
+2026-05-05,d185176,Update README.md
+2026-05-05,e0dbf1f,Merge pull request #1 from naheekwon/improved-phishing-detection
+2026-05-05,efbf881,Update README.md
+2026-05-06,1cd0a66,Add River progressive experiment results
+2026-05-06,24e404f,Merge pull request #4 from naheekwon/update-frontend-page
+2026-05-06,7d15f5a,Update latest experiment notebook
+2026-05-06,ad31586,Enhance frontend scroll animations
+2026-05-06,b826348,Update River progressive experiment notebook
+2026-05-06,d765acf,Merge pull request #3 from naheekwon/add-river-progressive-test
+2026-05-07,41247ee,feat: add Flask transformer API
+2026-05-07,7539b0e,Revise README with project overview and architecture
+2026-05-07,94aa5ff,Merge pull request #5 from naheekwon/add-flask-transformer-api
+2026-05-07,cf8c3af,Update README.md
+2026-05-08,028e069,feat: integrate PhiUSIIL meta-gate calibration
+2026-05-08,fc7f477,Merge pull request #6 from naheekwon/add-flask-transformer-api
+2026-05-11,a77eaf6,Add learned lexicon XAI evidence model
+2026-05-11,e751dd9,Merge pull request #7 from naheekwon/xai-evidence-risk-dict
+2026-05-12,02171b9,Update README.md
+2026-05-12,119d365,Update README.md
+2026-05-12,461cda2,merge main and keep cleanup deletions
+2026-05-12,49d0fe6,Update README.md
+2026-05-12,8313c9c,feat: clean up unused experiment files
+2026-05-12,90d82a3,Merge pull request #11 from naheekwon/feat/cleanup-current-files
+2026-05-17,47e1aa9,Update README.md
+2026-05-18,25035df,Merge pull request #12 from naheekwon/feat/web-backend-xai-integration
+2026-05-18,7b467e1,feat: integrate web backend and XAI detail
+2026-05-19,b60f58c,feat: improve XAI evidence quality
+2026-05-21,5e630fd,docs: update frontend architecture diagram
+2026-05-21,6cc6ada,chore: remove experiment notebook
+2026-05-21,75dd175,Merge pull request #14 from naheekwon/feat/cleanup-current-files
+2026-05-21,84fb509,Update README.md
+2026-05-21,8c6e53c,Merge pull request #13 from naheekwon/feat/xai-quality-improvements
+2026-05-21,b485313,Merge pull request #15 from naheekwon/update-frontend-page
+2026-05-21,e7f301c,feat: refine xai evidence explanations
+2026-05-22,15886b1,Merge pull request #16 from naheekwon/update-frontend-page
+2026-05-22,4339ced,feat: update frontend model copy
+2026-05-22,caa48dd,Revise architecture explanation in README
+2026-05-24,bce204e,feat: clarify xai evidence signal wording
+2026-05-24,e3a24ad,Merge pull request #17 from naheekwon/feat/xai-quality-improvements
+2026-05-25,3b0c4de,Update README.md
+2026-05-25,5d27388,Update README.md
+2026-05-25,67c4582,Update README.md
+2026-05-27,124e3f3,Merge pull request #18 from naheekwon/feat/web-production-backend
+2026-05-27,83abc7d,feat: update frontend content copy
+2026-05-27,95a7317,feat: build production-ready web backend
+2026-05-28,3bcd4db,Update README.md
+2026-05-28,7be6775,Update README.md
+2026-05-28,94fe978,Merge pull request #19 from naheekwon/update-frontend-page
+2026-05-28,b974a1d,feat: update README
+2026-05-28,d3cea62,feat: align frontend copy with model behavior
+2026-05-29,09726be,Update README.md
+2026-05-29,411aff5,merge main into xai quality branch
+2026-05-29,491776c,feat: improve xai presentation and readme
+2026-05-29,4c1e092,Merge pull request #20 from naheekwon/feat/xai-quality-improvements

@@ -1,0 +1,26 @@
+{
+  "date_range": {
+    "since": "2026-04-30",
+    "until": "2026-05-29"
+  },
+  "total_commits": 66,
+  "active_days": 17,
+  "max_daily_commits": 13,
+  "max_daily_commit_date": "2026-05-05",
+  "latest_day_commits": 4,
+  "category_counts": {
+    "Feature implementation": 18,
+    "Documentation / presentation": 24,
+    "Experiment / update": 4,
+    "Merge / PR integration": 19,
+    "Cleanup / maintenance": 1
+  },
+  "phase_counts": {
+    "Frontend UI": 12,
+    "Other updates": 1,
+    "Model experiments": 8,
+    "Docs / Git management": 28,
+    "Backend API": 7,
+    "XAI evidence": 10
+  }
+}
