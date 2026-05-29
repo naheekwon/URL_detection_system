@@ -838,6 +838,11 @@
                     return;
                 }
 
+                if (typeof window.openXaiDetail === "function") {
+                    window.openXaiDetail();
+                    return;
+                }
+
                 var data = window.latestPredictionData;
                 var xai = data.xai || {};
                 var evidence = data.evidence_decision || {};
@@ -869,24 +874,15 @@
                 html += "<h1>Lexicon-Context Evidence XAI</h1>";
                 html += "<p>" + esc(data.url) + "</p>";
                 html += "<section class='summary'><strong>Summary</strong><br>" + esc(xai.summary || "") + "</section>";
-                html += "<section><h2>Risk label</h2><table>";
-                html += row("URL risk label", data.prediction);
-                html += row("Model method", data.model_method || "Lexicon-Context Evidence Model");
-                html += row("Model confidence", Math.round((data.confidence || 0) * 1000) / 10 + "%");
+                html += "<section><h2>위험 라벨</h2><table>";
+                html += row("URL 위험 라벨", data.prediction);
+                html += row("분석 방식", data.model_method || "Lexicon-Context Evidence Module");
                 html += "</table></section>";
-                html += "<section><h2>Integrated evidence score</h2><code>" + esc(evidence.formula || "") + "</code><table>";
-                html += row("risk_score", evidence.risk_score);
-                html += row("url_score", evidence.url_score);
-                html += row("transformer_alignment_score", evidence.transformer_alignment_score);
-                html += row("page_score", evidence.page_score);
-                html += row("url_reasons", (evidence.url_reasons || []).join(" "));
-                html += row("page_reasons", (evidence.page_reasons || []).join(" "));
-                html += "</table></section>";
-                html += "<section><h2>Live page evidence</h2><table>";
-                ["fetched","final_url","status_code","title","form_count","password_input_count","external_form_action_count","iframe_count","js_obfuscation_score","ssl_checked","ssl_issuer","ssl_days_until_expiry","ssl_host_matches_cert","error"].forEach(function(key) {
-                    var rowHtml = row(key, page[key]);
-                    html += rowHtml;
-                });
+                html += "<section><h2>근거 점수 상세</h2><table>";
+                html += row("URL 문맥 근거 강도", evidenceLevel(evidence.risk_score) + " - 악성 확률이 아니라 설명 근거 강도");
+                html += row("Lexicon-context 근거", evidenceLevel(evidence.url_score));
+                html += row("Transformer 정렬 근거", evidenceLevel(evidence.transformer_alignment_score));
+                html += row("URL 근거 설명", (evidence.url_reasons || []).map(translateReason).join(" "));
                 html += "</table></section>";
                 html += "</main></body></html>";
                 detail.document.open();
@@ -922,26 +918,25 @@
 
                         window.latestPredictionData = data;
                         var prediction = data.prediction || "unknown";
-                        var confidence = Math.round((data.confidence || 0) * 1000) / 10;
                         var isBad = prediction !== "benign";
                         var color = isBad ? "#dc2626" : "#059669";
                         var bg = isBad ? "#fef2f2" : "#ecfdf5";
                         var border = isBad ? "#fecaca" : "#a7f3d0";
-                        var title = "Benign URL indicated";
+                        var title = "정상 URL로 판단됨";
                         if (prediction === "phishing") {
-                            title = "Phishing risk indicated";
+                            title = "피싱 위험 URL로 판단됨";
                         } else if (prediction === "malware") {
-                            title = "Malware URL risk indicated";
+                            title = "악성코드 유포 의심 URL로 판단됨";
                         } else if (prediction === "defacement") {
-                            title = "Defacement risk indicated";
+                            title = "웹사이트 변조 관련 URL로 판단됨";
                         } else if (isBad) {
-                            title = "Malicious URL risk indicated";
+                            title = "악성 URL 위험으로 판단됨";
                         }
 
                         resultBox.innerHTML =
                             "<h4 style='color:" + color + "; font-size:1.15rem; margin-bottom:8px;'>" + title + "</h4>" +
-                            "<p style='color:#475569; font-size:0.95rem; margin-bottom:15px;'>Lexicon-context evidence analysis result.</p>" +
-                            "<div style='background:" + bg + "; padding:12px 16px; border-radius:12px; font-size:0.9rem; color:" + color + "; border:1px solid " + border + ";'>Risk label: <strong>" + prediction + "</strong> · Evidence confidence " + confidence + "%</div>" +
+                            "<p style='color:#475569; font-size:0.95rem; margin-bottom:15px;'>Lexicon-context 근거 분석 결과입니다.</p>" +
+                            "<div style='background:" + bg + "; padding:12px 16px; border-radius:12px; font-size:0.9rem; color:" + color + "; border:1px solid " + border + ";'>위험 라벨: <strong>" + prediction + "</strong></div>" +
                             "<button type='button' class='xai-detail-button' onclick='robustOpenXaiDetail()'>XAI 상세보기</button>";
                         resultBox.style.borderColor = border;
                         resultBox.style.display = "block";
@@ -1122,8 +1117,8 @@
                     이 프로젝트는 AI 기반 URL 위험 탐지와 설명 가능한 보안 분석을 목표로 개발되었습니다.
                 </p>
 
-                <p 
-                    class="email-text scroll-reveal" 
+                <p
+                    class="email-text scroll-reveal"
                     data-motion="rise"
                     style="--delay: 0.06s;"
                 >
@@ -1175,8 +1170,82 @@
         }
 
         function pct(value) {
+            if (value === null || value === undefined || value === '') {
+                return 'N/A';
+            }
             const number = Number(value || 0);
             return `${(number * 100).toFixed(1)}%`;
+        }
+
+        function evidenceLevel(value, unavailable = false) {
+            if (unavailable || value === null || value === undefined || value === '') {
+                return 'N/A';
+            }
+            const number = Number(value || 0);
+            if (number >= 0.75) return '강함';
+            if (number >= 0.35) return '탐지 기준 충족';
+            if (number > 0) return '약함';
+            return '미사용';
+        }
+
+        function translateReason(reason) {
+            const text = String(reason || '');
+            const lower = text.toLowerCase();
+            if (!text) return '';
+            if (lower.includes('host is represented as an ip address') || lower.includes('raw ipv4 address')) {
+                return 'Host가 일반 등록 도메인이 아니라 IP 주소 형태로 구성되어 있습니다.';
+            }
+            if (lower.includes('host_is_ip') || lower.includes('ip-address host')) {
+                return 'host_is_ip는 호스트가 일반 도메인이 아니라 IP 주소로 직접 표현되었음을 나타내는 URL 구조 근거입니다.';
+            }
+            if (lower.includes('structural url evidence') && lower.includes('ip address')) {
+                return 'host_is_ip는 호스트가 일반 도메인이 아니라 IP 주소로 직접 표현되었음을 나타내는 URL 구조 근거입니다.';
+            }
+            if (lower.includes('url-level file-extension evidence')) {
+                const token = text.split(' ')[0];
+                return `${token}는 실행 파일 확장자 구조에서 나온 강한 URL 수준 근거입니다. 단, 파일 내용을 직접 분석했다는 의미는 아닙니다.`;
+            }
+            if (lower.includes('executable file extension') || lower.includes('executable extension') || lower.includes('file-delivery')) {
+                return 'URL 경로에서 실행 파일 전달형 구조가 확인됩니다. 파일 자체를 다운로드하거나 실행해 분석한 것은 아닙니다.';
+            }
+            if (lower.includes('http rather than https')) {
+                return 'HTTPS가 아닌 HTTP를 사용하므로 보조적인 위험 신호로만 사용됩니다.';
+            }
+            if (lower.includes('transformer-token alignment') || lower.includes('transformer alignment')) {
+                return 'Transformer 토큰 정렬은 URL 수준 근거와의 보조적 일치 신호로 사용되었습니다.';
+            }
+            if (lower.includes('contextual risk-intent terms')) {
+                return '위험 의도와 관련된 URL 토큰들이 같은 문맥에서 함께 관찰되었습니다.';
+            }
+            if (lower.includes('long subdomain')) {
+                return 'host가 인증 관련 토큰과 서비스명을 연상시키는 토큰을 결합한 긴 subdomain 구조를 가집니다.';
+            }
+            if (lower.includes('multiple credential-phishing intent terms')) {
+                return '계정 접근 및 로그인 유도 맥락의 토큰이 여러 개 함께 나타났습니다.';
+            }
+            if (lower.includes('brand term appears with credential-phishing terms outside the registered service domain')) {
+                const terms = text.split(':').slice(1).join(':').replace(/\.$/, '').trim();
+                return terms
+                    ? `${terms}와 같은 서비스명 연상 토큰이 인증 유도 토큰과 함께 공식 서비스 도메인이 아닌 URL 문맥에서 관찰되었습니다.`
+                    : '서비스명 연상 토큰이 인증 유도 토큰과 함께 공식 서비스 도메인이 아닌 URL 문맥에서 관찰되었습니다.';
+            }
+            if (lower.includes('defacement-related terms')) {
+                return '웹사이트 변조 맥락과 관련된 토큰이 URL 안에서 함께 나타났습니다.';
+            }
+            if (lower.includes('matched as') && lower.includes('token evidence')) {
+                const token = text.split(' ')[0];
+                return `${token} 토큰은 모델이 산출한 토큰 근거입니다. 단독 단어가 아니라 URL 문맥과 함께 해석합니다.`;
+            }
+            if (lower.includes('no login form')) {
+                return '로그인 폼, 비밀번호 입력창, 외부 전송 폼은 확인되지 않았습니다.';
+            }
+            if (lower.includes('page loaded normally with a visible title')) {
+                return '페이지가 정상적으로 로드되었고 제목 정보를 확인했습니다.';
+            }
+            if (lower.includes('learned risk dictionary')) {
+                return '학습 데이터 기반 위험 토큰 사전에서 URL 문맥과 일치하는 근거가 확인되었습니다.';
+            }
+            return text;
         }
 
         function openXaiDetail() {
@@ -1188,17 +1257,146 @@
 
             const data = currentPredictionData;
             const xai = data.xai;
+            const evidenceDecision = data.evidence_decision || null;
+            const visibleUrlReasons = (evidenceDecision && evidenceDecision.url_reasons) || [];
+            const evidenceLabel = (label) => ({
+                method: '분석 방식',
+                risk_score: 'URL 문맥 근거 강도',
+                url_score: 'Lexicon-context 근거',
+                transformer_alignment_score: 'Transformer 정렬 근거',
+                url_reasons: 'URL 근거 설명'
+            }[label] || label);
+            const evidenceValue = (label, value) => {
+                if (label === 'risk_score') {
+                    return `${evidenceLevel(value)} - 악성 확률이 아니라 설명 근거 강도`;
+                }
+                if (label === 'url_score') {
+                    return evidenceLevel(value);
+                }
+                if (['transformer_alignment_score'].includes(label)) {
+                    return evidenceLevel(value);
+                }
+                return value;
+            };
+            const tokenReason = (item) => {
+                const category = String(item.category || '');
+                const rawStrength = String(item.presentation_strength || item.strength || 'weak').toLowerCase();
+                if (item.feature === 'host_is_ip') {
+                    return 'URL 구조상 host가 IP 주소 형태로 표현된 근거입니다.';
+                }
+                if (category === 'file_extension') {
+                    return 'URL 경로의 파일 확장자 구조에서 나온 근거입니다. 파일 내용을 직접 분석했다는 의미는 아닙니다.';
+                }
+                if (rawStrength === 'strong') {
+                    return '모델이 강한 토큰 근거로 산출한 항목입니다. 단독 단어가 아니라 URL 문맥과 함께 해석합니다.';
+                }
+                if (rawStrength === 'medium' || rawStrength === 'supporting' || rawStrength === 'contextual') {
+                    return '모델이 보조 근거로 산출한 항목입니다. 단독 판단 근거로 사용하지 않습니다.';
+                }
+                return '낮은 기여도의 문맥 보조 항목입니다. 단독 위험 근거로 사용하지 않습니다.';
+            };
+            const strengthLabel = (value) => ({
+                strong: '강함',
+                medium: '보통',
+                weak: '약함',
+                supporting: '보조',
+                contextual: '문맥 보조',
+                ip_octet: 'IP 구성요소'
+            }[String(value || '').toLowerCase()] || value || '');
+            const displayStrength = (item) => {
+                const raw = item.presentation_strength || item.strength || 'weak';
+                if (raw === 'weak') {
+                    return '문맥 보조';
+                }
+                return strengthLabel(raw);
+            };
+            const categoryLabel = (value) => ({
+                file_extension: '파일 확장자',
+                url_rule: 'URL 구조 규칙',
+                lexical: '어휘 토큰',
+                domain: '도메인 구성 토큰',
+                path: '경로',
+                query: '쿼리',
+                character_ngram: '문자 n-gram'
+            }[String(value || '').toLowerCase()] || value || '');
+            const translateSource = (source) => ({
+                'URL context': 'URL 문맥',
+                'File/URL structure': '파일/URL 구조',
+                'IP host normalization': 'IP host 해석',
+                'File-delivery structure': '파일 전달 구조',
+                'Contextual combination': '문맥 결합 근거',
+                'Token evidence': '토큰 근거',
+                'Contextual token evidence': '문맥 토큰 근거',
+                'Transformer alignment': 'Transformer 정렬 근거',
+                'Defacement context': 'Defacement 문맥',
+                'Phishing context': 'Phishing 문맥',
+                'Query evidence': 'Query 근거',
+                'IP-based host': 'IP 기반 host',
+                'Executable file path': '실행 파일 경로',
+                'HTTP transport': 'HTTP 전송 방식',
+                'URL evidence': 'URL 근거'
+            }[source] || source || '근거');
+            const contextualSummary = (() => {
+                const topEvidence = xai.top_evidence || [];
+                const urlReasons = visibleUrlReasons;
+                const reasonText = urlReasons.join(' ').toLowerCase();
+                const host = (() => {
+                    try {
+                        return new URL(data.url).hostname.toLowerCase();
+                    } catch (error) {
+                        return String(data.url || '').toLowerCase();
+                    }
+                })();
+                const hasIpHost = topEvidence.some((item) => item.feature === 'host_is_ip') || reasonText.includes('ip address');
+                const hasExecutablePath = topEvidence.some((item) => item.category === 'file_extension' || String(item.feature || '').startsWith('ext:')) || reasonText.includes('executable file extension');
+                const hostedContext = ['pages.dev', 'workers.dev', 'github.io', 'netlify.app', 'vercel.app', 'web.app', 'firebaseapp.com'].find((suffix) => host.includes(suffix));
+
+                if (hasIpHost && hasExecutablePath) {
+                    return {
+                        title: '문맥 기반 XAI 요약',
+                        body: '이 URL에서는 IP 기반 host와 실행 파일 경로가 함께 관찰됩니다. 각 신호만으로 악성을 단정할 수는 없지만, 두 근거가 함께 나타나기 때문에 실행 파일 전달형 malware URL에서 볼 수 있는 의심스러운 구조로 해석됩니다.'
+                    };
+                }
+                if (reasonText.includes('credential-phishing') || reasonText.includes('brand term appears')) {
+                    const hostingText = hostedContext
+                        ? ` 또한 공식 서비스 도메인이 아니라 ${hostedContext} 하위의 호스팅 도메인 문맥에서 관찰됩니다.`
+                        : '';
+                    return {
+                        title: '문맥 기반 XAI 요약',
+                        body: `이 URL에서는 계정 접근 또는 서비스 사칭과 관련된 URL 문맥 근거가 함께 관찰됩니다.${hostingText} 단일 토큰 하나만으로 피싱을 단정하지 않고, 모델이 산출한 URL 문맥 근거의 조합을 phishing-like 구조로 해석합니다.`
+                    };
+                }
+                if (reasonText.includes('defacement-related')) {
+                    return {
+                        title: '문맥 기반 XAI 요약',
+                        body: `이 URL에서는 웹사이트 변조와 관련된 URL 문맥 근거가 함께 관찰됩니다. XAI는 이를 실제 사이트가 현재 변조되었다는 단정이 아니라, defacement 관련 내용을 포함한 URL 문맥으로 해석합니다.`
+                    };
+                }
+                return {
+                    title: '문맥 기반 XAI 요약',
+                    body: '이 설명은 개별 토큰 하나만의 판단이 아니라, 같은 URL 안에서 관찰된 근거들이 함께 만들어내는 문맥을 해석한 결과입니다. 아래의 개별 근거들은 최종 문맥 해석을 보조하는 신호입니다.'
+                };
+            })();
+            const contextualSummaryBox = `
+                <div class="policy-note">
+                    <strong>${escapeHtml(contextualSummary.title)}</strong><br>
+                    ${escapeHtml(contextualSummary.body)}
+                </div>
+            `;
+            const predictionKo = ({
+                phishing: '피싱 위험 URL',
+                malware: '악성코드 유포 의심 URL',
+                defacement: '웹사이트 변조 관련 URL',
+                benign: '정상 URL'
+            }[xai.final_prediction || data.prediction] || `${xai.final_prediction || data.prediction} URL`);
+            const koreanSummaryText = `시스템은 이 URL을 ${predictionKo}로 분류했습니다. 아래 XAI 결과는 개별 토큰 하나만의 판단이 아니라, URL 구조와 토큰들이 함께 나타나는 문맥을 기준으로 해석한 설명입니다.`;
             const evidenceRows = (xai.top_evidence || []).map((item, index) => `
                 <tr>
                     <td>${index + 1}</td>
                     <td><strong>${escapeHtml(item.display)}</strong><span>${escapeHtml(item.feature)}</span></td>
-                    <td>${escapeHtml(item.category)}</td>
-                    <td>${pct(item.transformer_score)}</td>
-                    <td>${pct(item.dictionary_score)}</td>
-                    <td>${pct(item.case_score)}</td>
-                    <td>x${Number(item.rule_factor || 1).toFixed(2)}</td>
-                    <td>${escapeHtml(item.presentation_strength || item.strength || 'weak')}</td>
-                    <td><strong>${pct(item.explanation_score)}</strong></td>
+                    <td>${escapeHtml(categoryLabel(item.category))}</td>
+                    <td>${escapeHtml(displayStrength(item))}</td>
+                    <td>${escapeHtml(tokenReason(item))}</td>
                 </tr>
             `).join('');
             const caseRows = (xai.similar_cases || []).map((item) => `
@@ -1208,108 +1406,114 @@
                     <td>${escapeHtml(item.url)}</td>
                 </tr>
             `).join('');
-            const pageEvidence = data.page_evidence || null;
-            const pageEvidenceRows = pageEvidence ? Object.entries({
-                fetched: pageEvidence.fetched,
-                final_url: pageEvidence.final_url || pageEvidence.url,
-                status_code: pageEvidence.status_code,
-                redirected: pageEvidence.redirected,
-                title: pageEvidence.title,
-                form_count: pageEvidence.form_count,
-                password_input_count: pageEvidence.password_input_count,
-                external_form_action_count: pageEvidence.external_form_action_count,
-                insecure_form_action_count: pageEvidence.insecure_form_action_count,
-                iframe_count: pageEvidence.iframe_count,
-                external_script_count: pageEvidence.external_script_count,
-                inline_script_count: pageEvidence.inline_script_count,
-                js_eval_count: pageEvidence.js_eval_count,
-                js_document_write_count: pageEvidence.js_document_write_count,
-                js_atob_count: pageEvidence.js_atob_count,
-                js_long_string_count: pageEvidence.js_long_string_count,
-                js_obfuscation_score: pageEvidence.js_obfuscation_score,
-                ssl_checked: pageEvidence.ssl_checked,
-                ssl_issuer: pageEvidence.ssl_issuer,
-                ssl_days_until_expiry: pageEvidence.ssl_days_until_expiry,
-                ssl_host_matches_cert: pageEvidence.ssl_host_matches_cert,
-                ssl_error: pageEvidence.ssl_error,
-                suspicious_text_keywords: (pageEvidence.suspicious_text_keywords || []).join(', '),
-                error: pageEvidence.error
-            }).map(([label, value]) => `
-                <tr>
-                    <td>${escapeHtml(label)}</td>
-                    <td>${escapeHtml(value)}</td>
-                </tr>
-            `).join('') : '';
-            const evidenceDecision = data.evidence_decision || null;
             const barWidth = (value) => Math.max(0, Math.min(100, Number(value || 0) * 100)).toFixed(1);
+            const componentValue = (label, value) => evidenceLevel(value);
             const componentBars = evidenceDecision ? [
-                ['Integrated risk signal', evidenceDecision.risk_score, '#0f172a'],
-                ['URL lexicon', evidenceDecision.url_score, '#2563eb'],
-                ['Transformer alignment', evidenceDecision.transformer_alignment_score, '#7c3aed'],
-                ['Static page evidence', evidenceDecision.page_score, '#16a34a']
+                ['URL 문맥 근거 강도', evidenceDecision.risk_score, '#0f172a'],
+                ['Lexicon-context 근거', evidenceDecision.url_score, '#2563eb'],
+                ['Transformer 정렬 근거', evidenceDecision.transformer_alignment_score, '#7c3aed']
             ].map(([label, value, color]) => `
                 <div class="score-bar-row">
                     <span>${escapeHtml(label)}</span>
                     <div><i style="width:${barWidth(value)}%; background:${color};"></i></div>
-                    <strong>${pct(value)}</strong>
+                    <strong>${escapeHtml(componentValue(label, value))}</strong>
                 </div>
             `).join('') : '';
-            const tokenBars = (xai.top_evidence || []).slice(0, 6).map((item) => `
+            const visibleTokenEvidence = (xai.top_evidence || []).slice(0, 6);
+            const maxTokenScore = Math.max(
+                ...visibleTokenEvidence.map((item) => Number(item.explanation_score || 0)),
+                0.0001
+            );
+            const tokenBarWidth = (value) => Math.max(4, Math.min(100, (Number(value || 0) / maxTokenScore) * 100)).toFixed(1);
+            const tokenBars = visibleTokenEvidence.map((item) => `
                 <div class="token-bar-row">
-                    <span><strong>${escapeHtml(item.display)}</strong><em>${escapeHtml(item.category)}</em></span>
-                    <div><i style="width:${barWidth(item.explanation_score)}%;"></i></div>
-                    <strong>${pct(item.explanation_score)}</strong>
+                    <span><strong>${escapeHtml(item.display)}</strong><em>${escapeHtml(categoryLabel(item.category))}</em></span>
+                    <div><i style="width:${tokenBarWidth(item.explanation_score)}%;"></i></div>
+                    <strong>${escapeHtml(displayStrength(item))}</strong>
                 </div>
             `).join('');
-            const decisionEvidenceBars = (xai.decision_evidence || []).slice(0, 6).map((item) => `
+            const normalizedDecisionEvidence = (() => {
+                const items = xai.decision_evidence || [];
+                const normalized = [];
+                const seen = new Set();
+                const add = (source, reason, value, unavailable = false) => {
+                    if (seen.has(source)) return;
+                    seen.add(source);
+                    normalized.push({ source, reason, value, unavailable });
+                };
+
+                items.forEach((item) => {
+                    if (String(item.source || '').toLowerCase().includes('static page')) {
+                        return;
+                    }
+                    const reason = String(item.reason || '');
+                    const text = reason.toLowerCase();
+                    if (text.includes('ip address')) {
+                        add('IP 기반 host', 'Host가 일반 등록 도메인이 아니라 IPv4 주소 형태로 직접 사용되었습니다.', item.score);
+                    } else if (text.includes('executable file extension') || text.includes('file-delivery')) {
+                        add('실행 파일 경로', 'URL 경로가 실행 파일 확장자로 끝나 파일 전달형 위험 구조를 보입니다.', item.score);
+                    } else if (text.includes('http rather than https')) {
+                        add('HTTP 전송 방식', 'HTTPS가 아닌 HTTP를 사용하므로 보조적인 위험 신호로만 사용됩니다.', Math.min(Number(item.score || 0), 0.2));
+                    } else if (text.includes('long subdomain')) {
+                        add('긴 subdomain 구조', 'host가 인증 관련 토큰과 서비스명을 연상시키는 토큰을 결합한 긴 subdomain 구조를 가집니다.', item.score);
+                    } else if (String(item.source || '').toLowerCase().includes('transformer')) {
+                        add('Transformer 정렬 근거', '토큰 정렬에서 약한 보조 신호가 확인되었습니다.', item.score);
+                    } else if (!text.includes('contextual risk-intent terms in url: exe')) {
+                        add(translateSource(item.source || 'URL evidence'), translateReason(reason), item.score);
+                    }
+                });
+
+                return normalized.slice(0, 6);
+            })();
+            const decisionEvidenceBars = normalizedDecisionEvidence.map((item) => `
                 <div class="decision-bar-row">
                     <span><strong>${escapeHtml(item.source)}</strong><em>${escapeHtml(item.reason)}</em></span>
-                    <div><i style="width:${barWidth(item.score)}%;"></i></div>
-                    <strong>${pct(item.score)}</strong>
+                    <div><i style="width:${barWidth(item.value)}%;"></i></div>
+                    <strong>${escapeHtml(evidenceLevel(item.value, item.unavailable))}</strong>
                 </div>
             `).join('');
+            const visibleEvidenceItems = (items) => (items || []).filter((item) => (
+                !String(item.source || '').toLowerCase().includes('static page')
+            ));
             const evidenceList = (items, fallback) => {
-                const rows = (items || []).slice(0, 4).map((item) => `
+                const rows = visibleEvidenceItems(items).slice(0, 4).map((item) => `
                     <article>
-                        <strong>${escapeHtml(item.source || 'Evidence')}</strong>
-                        <p>${escapeHtml(item.reason || '')}</p>
+                        <strong>${escapeHtml(translateSource(item.source || 'Evidence'))}</strong>
+                        <p>${escapeHtml(translateReason(item.reason || ''))}</p>
                     </article>
                 `).join('');
                 return rows || `<p class="viz-note">${escapeHtml(fallback)}</p>`;
             };
             const mainEvidenceItems = evidenceList(
                 xai.main_evidence,
-                'No dominant URL-level evidence was available.'
+                '주요 URL 수준 근거가 확인되지 않았습니다.'
             );
             const strongEvidenceItems = evidenceList(
                 xai.strong_evidence,
-                'No strong token-level evidence was available.'
+                '강한 토큰 수준 근거가 확인되지 않았습니다.'
             );
             const supportingEvidenceItems = evidenceList(
                 xai.supporting_evidence,
-                'No supporting transformer or static-page evidence was available.'
+                'Transformer 기반 보조 근거가 확인되지 않았습니다.'
             );
             const evidenceDecisionRows = evidenceDecision ? [
                 ['method', evidenceDecision.method],
-                ['risk_score', pct(evidenceDecision.risk_score)],
-                ['url_score', pct(evidenceDecision.url_score)],
-                ['transformer_alignment_score', pct(evidenceDecision.transformer_alignment_score)],
-                ['page_score', pct(evidenceDecision.page_score)],
-                ['formula', evidenceDecision.formula],
-                ['url_reasons', (evidenceDecision.url_reasons || []).join(' ')],
-                ['page_reasons', (evidenceDecision.page_reasons || []).join(' ')]
+                ['risk_score', evidenceDecision.risk_score],
+                ['url_score', evidenceDecision.url_score],
+                ['transformer_alignment_score', evidenceDecision.transformer_alignment_score],
+                ['url_reasons', visibleUrlReasons.map(translateReason).join(' ')]
             ].map(([label, value]) => `
                 <tr>
-                    <td>${escapeHtml(label)}</td>
-                    <td>${escapeHtml(value)}</td>
+                    <td>${escapeHtml(evidenceLabel(label))}</td>
+                    <td>${escapeHtml(evidenceValue(label, value))}</td>
                 </tr>
             `).join('') : '';
             const componentRows = Object.entries(data.evidence_decision || {}).filter(([label]) => (
-                ['risk_score', 'url_score', 'transformer_alignment_score', 'page_score', 'formula'].includes(label)
+                ['risk_score', 'url_score', 'transformer_alignment_score'].includes(label)
             )).map(([label, value]) => `
                 <tr>
-                    <td>${escapeHtml(label)}</td>
-                    <td>${escapeHtml(value)}</td>
+                    <td>${escapeHtml(evidenceLabel(label))}</td>
+                    <td>${escapeHtml(evidenceValue(label, value))}</td>
                 </tr>
             `).join('');
 
@@ -1527,113 +1731,93 @@
                 </head>
                 <body>
                     <main class="shell">
-                        <h1>Lexicon-Context Guided XAI</h1>
+                        <h1>Lexicon-Context 기반 XAI</h1>
                         <p class="url">${escapeHtml(data.url)}</p>
 
-                        <div class="summary">${escapeHtml(xai.summary)}</div>
+                        <div class="summary"><strong>분석 요약</strong><br>${escapeHtml(koreanSummaryText)}</div>
+                        ${contextualSummaryBox}
                         <section class="grid">
-                            <div class="metric"><span>URL risk label</span><strong>${escapeHtml(xai.final_prediction || data.prediction)}</strong></div>
-                            <div class="metric"><span>Explanation target</span><strong>${escapeHtml(xai.explanation_target_prediction || data.prediction)}</strong></div>
-                            <div class="metric"><span>Model method</span><strong>${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</strong></div>
-                            <div class="metric"><span>Model confidence</span><strong>${pct(data.confidence)}</strong></div>
-                            <div class="metric"><span>Evidence signal</span><strong>${pct(xai.xai_confidence)}</strong></div>
-                            <div class="metric"><span>Top evidence mean</span><strong>${pct(xai.mean_top_evidence_score)}</strong></div>
+                            <div class="metric"><span>URL 위험 라벨</span><strong>${escapeHtml(xai.final_prediction || data.prediction)}</strong></div>
+                            <div class="metric"><span>설명 대상</span><strong>${escapeHtml(xai.explanation_target_prediction || data.prediction)}</strong></div>
+                            <div class="metric"><span>분석 방식</span><strong>${escapeHtml(data.model_method || 'Lexicon-Context Evidence Module')}</strong></div>
+                            <div class="metric"><span>URL 문맥 근거 강도</span><strong>${evidenceLevel(xai.xai_confidence)}</strong></div>
                         </section>
 
                         <section class="evidence-summary">
                             <div class="evidence-list">
-                                <h2>Main evidence</h2>
+                                <h2>주요 근거</h2>
                                 ${mainEvidenceItems}
                             </div>
                             <div class="evidence-list">
-                                <h2>Strong token evidence</h2>
+                                <h2>강한 토큰 근거</h2>
                                 ${strongEvidenceItems}
                             </div>
                             <div class="evidence-list">
-                                <h2>Supporting evidence</h2>
+                                <h2>보조 근거</h2>
                                 ${supportingEvidenceItems}
                             </div>
                         </section>
 
-                        <section class="panel">
-                            <h2>Proposed formula</h2>
-                            <code>${escapeHtml(xai.formula)}</code>
-                            <code>${escapeHtml(xai.confidence_formula)}</code>
-                            <p class="viz-note">The formula computes token-level E_i. The URL risk label is explained by the integrated evidence signal below, not by file-content inspection.</p>
-                            <p class="viz-note">${escapeHtml(xai.transformer_alignment_explanation || '')}</p>
-                        </section>
-
                         <section class="viz-grid">
                             <div class="viz-box">
-                                <h2>Evidence contribution graph</h2>
-                                ${componentBars || '<p class="viz-note">No component score data.</p>'}
-                                <p class="viz-note">The integrated risk signal summarizes URL lexicon evidence, Transformer-token alignment, and static page evidence. It is an explanation signal, not a guarantee that downloaded content was analyzed.</p>
+                                <h2>판단 근거 구성 비율</h2>
+                                ${componentBars || '<p class="viz-note">구성 점수 데이터가 없습니다.</p>'}
+                                <p class="viz-note">이 값은 악성 확률이 아니라, 최종 판단을 설명하기 위한 evidence contribution입니다. 외부 페이지 접속, 파일 다운로드, 동적 실행 분석은 수행하지 않습니다.</p>
                             </div>
                             <div class="viz-box">
-                                <h2>Top token evidence graph</h2>
-                                ${tokenBars || '<p class="viz-note">No dominant token evidence.</p>'}
-                                <p class="viz-note">Each bar shows E_i, the combined token-level explanation score. Weak tokens are shown as saliency context, not standalone risk evidence.</p>
+                                <h2>토큰별 설명 기여도</h2>
+                                ${tokenBars || '<p class="viz-note">두드러진 토큰 근거가 없습니다.</p>'}
+                                <p class="viz-note">막대 길이는 이 그래프 안에서의 상대적 토큰 기여도를 보여줍니다. 강도 라벨은 단일 퍼센트 크기가 아니라 모델이 산출한 evidence strength를 뜻하며, 약한 토큰은 단독 위험 근거가 아니라 문맥 보조 신호로 해석됩니다.</p>
                             </div>
                         </section>
 
                         <section class="panel">
-                            <h2>Decision evidence graph</h2>
-                            ${decisionEvidenceBars || '<p class="viz-note">No decision-level evidence was available.</p>'}
-                            <p class="viz-note">This graph shows decision-level risk evidence. Token evidence below is only a supporting saliency view.</p>
+                            <h2>판단 근거 그래프</h2>
+                            ${decisionEvidenceBars || '<p class="viz-note">판단 수준 근거가 없습니다.</p>'}
+                            <p class="viz-note">이 그래프는 반복되는 URL 수준 근거를 판단 범주로 묶어 보여줍니다. 하나의 구조적 신호가 여러 독립 근거처럼 보이지 않도록 정리한 것입니다.</p>
                         </section>
 
                         <section class="panel">
-                            <h2>Integrated evidence score</h2>
+                            <h2>근거 점수 상세</h2>
                             <table>
-                                <tbody>${evidenceDecisionRows || '<tr><td colspan="2">Evidence decision was not available.</td></tr>'}</tbody>
+                                <tbody>${evidenceDecisionRows || '<tr><td colspan="2">근거 판단 정보가 없습니다.</td></tr>'}</tbody>
                             </table>
                         </section>
 
                         <section class="panel">
-                            <h2>Integrated score details</h2>
+                            <h2>구성 요소 상세</h2>
                             <table>
-                                <tbody>${componentRows || '<tr><td colspan="2">No component score data.</td></tr>'}</tbody>
+                                <tbody>${componentRows || '<tr><td colspan="2">구성 점수 데이터가 없습니다.</td></tr>'}</tbody>
                             </table>
                         </section>
 
                         <section class="panel">
-                            <h2>Token evidence</h2>
+                            <h2>토큰 근거</h2>
                             <table>
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Token</th>
-                                        <th>Type</th>
-                                        <th>Token saliency</th>
-                                        <th>Dictionary</th>
-                                        <th>Case</th>
-                                        <th>Rule</th>
-                                        <th>Strength</th>
-                                        <th>E_i</th>
+                                        <th>토큰</th>
+                                        <th>유형</th>
+                                        <th>강도</th>
+                                        <th>이유</th>
                                     </tr>
                                 </thead>
-                                <tbody>${evidenceRows || '<tr><td colspan="9">No dominant evidence token.</td></tr>'}</tbody>
+                                <tbody>${evidenceRows || '<tr><td colspan="5">주요 근거 토큰이 없습니다.</td></tr>'}</tbody>
                             </table>
                         </section>
 
                         <section class="panel">
-                            <h2>Live page evidence</h2>
-                            <table>
-                                <tbody>${pageEvidenceRows || '<tr><td colspan="2">Page evidence was not collected.</td></tr>'}</tbody>
-                            </table>
-                        </section>
-
-                        <section class="panel">
-                            <h2>Similar URL cases</h2>
+                            <h2>유사 URL 사례</h2>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Label</th>
-                                        <th>Similarity</th>
+                                        <th>라벨</th>
+                                        <th>유사도</th>
                                         <th>URL</th>
                                     </tr>
                                 </thead>
-                                <tbody>${caseRows || '<tr><td colspan="3">No similar case was found.</td></tr>'}</tbody>
+                                <tbody>${caseRows || '<tr><td colspan="3">유사 URL 사례가 없습니다.</td></tr>'}</tbody>
                             </table>
                         </section>
                     </main>
@@ -1673,17 +1857,16 @@
                 window.latestPredictionData = data;
 
                 const prediction = data.prediction;
-                const confidence = Math.round((data.confidence || 0) * 1000) / 10;
-                const modelLine = `<p style="color: #64748b; font-size: 0.86rem; margin-top: 8px;">${escapeHtml(data.model_method || 'Lexicon-Context Evidence Model')}</p>`;
+                const modelLine = `<p style="color: #64748b; font-size: 0.86rem; margin-top: 8px;">${escapeHtml(data.model_method || 'Lexicon-Context Evidence Module')}</p>`;
                 const detailButton = `<button type="button" class="xai-detail-button" onclick="openXaiDetail()">XAI 상세보기</button>`;
 
-                const resultMeta = `Risk label: <strong style="font-size:1rem;">${prediction}</strong> · Evidence confidence ${confidence}% ${modelLine}`;
+                const resultMeta = `위험 라벨: <strong style="font-size:1rem;">${prediction}</strong>${modelLine}`;
 
                 if (prediction === 'phishing') {
                     resultBox.innerHTML = `
-                        <h4 style="color: #dc2626; font-size: 1.15rem; margin-bottom: 8px;">Phishing risk indicated</h4>
+                        <h4 style="color: #dc2626; font-size: 1.15rem; margin-bottom: 8px;">피싱 위험 URL로 판단됨</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
-                            The model found URL-level evidence signals associated with the phishing class.
+                            계정 접근이나 인증 정보 요청과 관련된 URL 문맥 근거가 확인되었습니다.
                         </p>
                         <div style="background: #fef2f2; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #7f1d1d; border: 1px solid #fecaca;">${resultMeta}</div>
                         ${detailButton}
@@ -1692,9 +1875,9 @@
                     resultBox.style.boxShadow = "0 10px 30px rgba(220, 38, 38, 0.1)";
                 } else if (prediction === 'malware') {
                     resultBox.innerHTML = `
-                        <h4 style="color: #d97706; font-size: 1.15rem; margin-bottom: 8px;">Malware URL risk indicated</h4>
+                        <h4 style="color: #d97706; font-size: 1.15rem; margin-bottom: 8px;">악성코드 유포 의심 URL로 판단됨</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
-                            The model found URL-level evidence signals associated with the malware class.
+                            실행 파일 경로 또는 파일 전달형 구조와 관련된 URL 문맥 근거가 확인되었습니다.
                         </p>
                         <div style="background: #fffbeb; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #92400e; border: 1px solid #fde68a;">${resultMeta}</div>
                         ${detailButton}
@@ -1703,9 +1886,9 @@
                     resultBox.style.boxShadow = "0 10px 30px rgba(217, 119, 6, 0.1)";
                 } else if (prediction === 'defacement') {
                     resultBox.innerHTML = `
-                        <h4 style="color: #0284c7; font-size: 1.15rem; margin-bottom: 8px;">Defacement risk indicated</h4>
+                        <h4 style="color: #0284c7; font-size: 1.15rem; margin-bottom: 8px;">웹사이트 변조 관련 URL로 판단됨</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
-                            This URL contains defacement-risk indicators such as hacked/owned page context or abnormal path patterns.
+                            웹사이트 침해/변조 문맥과 관련된 URL 근거가 확인되었습니다.
                         </p>
                         <div style="background: #f0f9ff; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #075985; border: 1px solid #bae6fd;">${resultMeta}</div>
                         ${detailButton}
@@ -1714,9 +1897,9 @@
                     resultBox.style.boxShadow = "0 10px 30px rgba(2, 132, 199, 0.1)";
                 } else {
                     resultBox.innerHTML = `
-                        <h4 style="color: #059669; font-size: 1.15rem; margin-bottom: 8px;">Benign URL indicated</h4>
+                        <h4 style="color: #059669; font-size: 1.15rem; margin-bottom: 8px;">정상 URL로 판단됨</h4>
                         <p style="color: #475569; font-size: 0.95rem; margin-bottom: 15px;">
-                            This URL did not show strong URL-level risk indicators in the current evidence view.
+                            현재 근거 기준에서 강한 URL 수준 위험 신호가 확인되지 않았습니다.
                         </p>
                         <div style="background: #ecfdf5; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; color: #065f46; border: 1px solid #a7f3d0;">${resultMeta}</div>
                         ${detailButton}
