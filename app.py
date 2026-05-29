@@ -885,7 +885,7 @@ def backend_info():
             "URL request from frontend",
             "model artifacts loaded in app.py",
             "feature extraction and Transformer alignment",
-            "Lexicon-Context evidence decision",
+            "Lexicon-Context evidence module",
             "XAI JSON response",
             "frontend result card and XAI detail rendering",
         ],
@@ -921,7 +921,7 @@ def predict():
         }), 400
 
     try:
-        inspect_pages = bool(payload.get("inspect_page", True))
+        inspect_pages = bool(payload.get("inspect_page", False))
         include_debug = bool(payload.get("debug", False))
         results, stats = hybrid_predict(
             urls,

@@ -210,7 +210,6 @@ def _presentation_strength(item, explanation_target, url_reasons, top_evidence):
 
 def _token_reason(item, explanation_target, url_reasons, top_evidence):
     token = item["display"]
-    score = round(float(item["explanation_score"]) * 100, 1)
     lower_token = str(token).lower()
     has_executable = _has_executable_extension_signal(url_reasons, top_evidence)
 
@@ -222,13 +221,13 @@ def _token_reason(item, explanation_target, url_reasons, top_evidence):
 
     if str(item.get("feature", "")) == "host_is_ip":
         return (
-            f"{token} is structural URL evidence indicating that the host is an IP address rather than a registered domain "
-            f"(E_i={score}%)."
+            f"{token} is structural URL evidence indicating that the host is an IP address rather than a registered domain. "
+            "It is treated as strong URL-structure evidence."
         )
 
     if item.get("category") == "file_extension":
         return (
-            f"{token} is treated as URL-level file-extension evidence with E_i={score}%. "
+            f"{token} is treated as strong URL-level file-extension evidence. "
             "This does not inspect the downloaded file itself; it only explains risk from the URL structure."
         )
 
@@ -239,18 +238,19 @@ def _token_reason(item, explanation_target, url_reasons, top_evidence):
     ):
         return (
             f"{token} can also appear in benign software URLs, so it is not used as standalone malware proof. "
-            f"It increases the explanation score because it appears together with an executable file-extension/path pattern (E_i={score}%)."
+            f"It increases the explanation score because it appears together with an executable file-extension/path pattern. "
+            "It is shown as contextual supporting evidence."
         )
 
     if _is_common_context_token(item):
         return (
             f"{token} is a contextual token that can appear in benign URLs; "
-            f"its evidence is interpreted only with surrounding URL structure (E_i={score}%)."
+            "its evidence is interpreted only with surrounding URL structure."
         )
 
     return (
         f"{token} matched as {item['strength']} token evidence "
-        f"with E_i={score}%."
+        "in the URL context."
     )
 
 
@@ -831,7 +831,9 @@ def build_xai_explanation(
         "score": round(decision_transformer_score, 4),
     })
 
-    if page_reasons:
+    show_page_evidence = bool(page_reasons and decision_page_score > 0)
+
+    if show_page_evidence:
         supporting_evidence.append({
             "source": "Static page evidence",
             "reason": page_reasons[0],
@@ -845,12 +847,13 @@ def build_xai_explanation(
             "score": round(decision_url_score, 4),
         })
 
-    for reason in page_reasons[:3]:
-        decision_items.append({
-            "source": "Static page evidence",
-            "reason": reason,
-            "score": round(decision_page_score, 4),
-        })
+    if show_page_evidence:
+        for reason in page_reasons[:3]:
+            decision_items.append({
+                "source": "Static page evidence",
+                "reason": reason,
+                "score": round(decision_page_score, 4),
+            })
 
     if decision_transformer_score > 0:
         decision_items.append({
@@ -891,9 +894,7 @@ def build_xai_explanation(
 
     return {
         "method": "Lexicon-Context Guided XAI",
-        "formula": "E_i = (0.45*A_i + 0.30*D_i + 0.25*K_i) * R_i",
-        "confidence_formula": "XAI(x) = evidence signal from model confidence and top-k explanation scores",
-        "decision_module": "Lexicon-Context Evidence Model",
+        "decision_module": "Lexicon-Context Evidence Module",
         "weights": {
             "token_saliency": ALPHA_TRANSFORMER,
             "dictionary": BETA_DICTIONARY,

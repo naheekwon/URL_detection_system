@@ -416,7 +416,7 @@ def _url_evidence(url, learned_risk_dict=None):
 
     if len(host_parts) >= 4 and not is_ipv4_host:
         score += 0.08
-        reasons.append("Host contains many domain parts.")
+        reasons.append("Host contains a long subdomain combining authentication-related or service-like tokens.")
 
     sld_letters = sum(ch.isalpha() for ch in sld)
     sld_digits = sum(ch.isdigit() for ch in sld)
@@ -538,9 +538,9 @@ def _page_evidence_score(page_evidence):
     if not page_evidence.get("fetched"):
         error = page_evidence.get("error") or "unknown error"
         if error in {"dns_resolution_failed", "http_error"}:
-            return 0.08, [f"Live page evidence unavailable for this test URL ({error})."]
+            return 0.0, [f"Static page evidence was not used because live page evidence was unavailable ({error})."]
 
-        return 0.08, [f"Live page evidence unavailable ({error})."]
+        return 0.0, [f"Static page evidence was not used because live page evidence was unavailable ({error})."]
 
     if not page_evidence.get("html_analyzed"):
         return 0.05, ["Fetched resource was not HTML, so page-level phishing signals were limited."]
@@ -595,7 +595,7 @@ def _page_evidence_score(page_evidence):
             + "."
         )
 
-    if malware_keywords and not has_sensitive_interaction:
+    if malware_keywords and not has_sensitive_interaction and not defacement_keywords:
         score += min(0.20, 0.06 * len(malware_keywords))
         reasons.append(
             "Download/malware lure text was found on the page: "
@@ -680,8 +680,8 @@ def classify_with_evidence(
         page_evidence=page_evidence,
     )
 
-    return {
-        "method": "Learned Lexicon-Context Evidence Model",
+    result = {
+        "method": "Lexicon-Context Evidence Module",
         "prediction": prediction,
         "is_malicious": prediction != "benign",
         "risk_score": round(final_score, 4),
@@ -691,13 +691,15 @@ def classify_with_evidence(
         "url_score": round(url_score, 4),
         "transformer_alignment_score": round(transformer_score, 4),
         "transformer_alignment_top_matches": transformer_alignment.get("top_matches", []),
-        "page_score": round(page_score, 4),
         "type_scores": {
             label: round(score, 4)
             for label, score in type_scores.items()
         },
         "url_reasons": url_reasons,
-        "page_reasons": page_reasons,
-        "formula": "Risk(x) = max(0.40*LearnedURLLexicon(x) + 0.25*TransformerLexiconAlignment(x) + 0.35*StaticPageEvidence(x), strong evidence floor)",
-        "confidence_formula": "Conf(x) = 0.55 + 0.35 * normalized_distance_from_threshold, capped by evidence availability",
     }
+
+    if page_evidence and page_evidence.get("fetched"):
+        result["page_score"] = round(page_score, 4)
+        result["page_reasons"] = page_reasons
+
+    return result
