@@ -60,13 +60,6 @@ Risk(x) = max(
 - `StaticPageEvidence(x)`: HTML, form, password input, 외부 form action, SSL, defacement text 등 정적 페이지 근거 점수
 - `strong evidence floor`: URL 또는 페이지에서 강한 위험 근거가 발견될 때 위험도가 과도하게 희석되지 않도록 하는 보정항
 
-confidence는 100%로 과확신하지 않도록 threshold로부터의 거리를 기반으로 보수적으로 계산합니다.
-
-```text
-Conf(x) = 0.55 + 0.35 * normalized_distance_from_threshold
-```
-
-페이지 evidence가 수집되지 않았거나 HTML 분석이 제한된 경우 confidence는 추가로 제한됩니다.
 
 ## XAI 출력
 
