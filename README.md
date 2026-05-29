@@ -16,7 +16,7 @@
 
 ## 시스템 아키텍처
 
-현재 구현된 최종 모듈은 다음과 같은 구조를 가집니다.
+현재 구현된 시스템은 URL 입력, 멀티클래스 탐지, XAI 근거 생성, 대시보드 시각화로 이어지는 웹 기반 구조를 가집니다.
 <br/>
 <img src="frontend/architecture.png" alt="LinkWatcher detection model architecture">
 <br/>
@@ -58,7 +58,7 @@ Risk evidence(x) = f(
 
 ## XAI 출력
 
-상세보기 화면에서는 다음 정보를 제공합니다.
+상세보기 화면에서는 최종 예측 결과와 함께 다음 핵심 근거를 제공합니다.
 
 - 최종 판정 클래스
 - URL 문맥 근거 강도
@@ -90,6 +90,7 @@ PowerShell에서 다음 명령어로 실행할 수 있습니다.
 
 ```powershell
 cd C:\Users\CSOS\Desktop\url_detection_web\phishing-url-detection
+& C:\Users\CSOS\anaconda3\python.exe -m pip install -r requirements.txt
 & C:\Users\CSOS\anaconda3\python.exe app.py
 ```
 
@@ -116,5 +117,4 @@ Content-Type: application/json
   "url": "http://example.com"
 }
 ```
-
 
